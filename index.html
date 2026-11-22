@@ -32,25 +32,6 @@
     </div>
   </div>
 
-  <!-- ============ LOGIN ============ -->
-  <section id="login" class="login hidden" aria-label="Sign in">
-    <form id="loginForm" class="login-card glass" autocomplete="on">
-      <div class="logo-plate logo-plate--lg"><img src="assets/skynet-logo.png" alt="SKYNET Worldwide Express"></div>
-      <h1>Customer Credit Limit Report</h1>
-      <p class="muted">Authorised SKYNET staff only. Please sign in to continue.</p>
-      <label class="field"><span>Username</span>
-        <div class="input-icon"><i data-lucide="user"></i><input id="loginUser" name="username" autocomplete="username" required></div>
-      </label>
-      <label class="field"><span>Password</span>
-        <div class="input-icon"><i data-lucide="lock"></i><input id="loginPass" name="password" type="password" autocomplete="current-password" required>
-          <button type="button" class="icon-btn ghost" id="togglePass" aria-label="Show password"><i data-lucide="eye"></i></button></div>
-      </label>
-      <p id="loginError" class="form-error" role="alert"></p>
-      <button class="btn btn-primary btn-block" id="loginBtn" type="submit"><i data-lucide="log-in"></i> Sign in</button>
-      <p class="login-foot"><span id="loginMode"></span> · <span id="loginClock"></span></p>
-    </form>
-  </section>
-
   <!-- ============ APP SHELL ============ -->
   <div id="app" class="app hidden">
     <aside id="sidebar" class="sidebar glass" aria-label="Main navigation">
@@ -72,10 +53,6 @@
         <a href="#themes" data-view="themes" class="nav-link"><i data-lucide="palette"></i><span>Theme Settings</span></a>
       </nav>
       <div class="sidebar-foot">
-        <div class="user-chip"><div class="avatar" id="userAvatar">A</div>
-          <div><b id="userName">User</b><small id="userRole">Viewer</small></div>
-          <button class="icon-btn ghost" id="logoutBtn" title="Sign out" aria-label="Sign out"><i data-lucide="log-out"></i></button>
-        </div>
         <small class="muted">© SKYNET Worldwide Express</small>
       </div>
     </aside>
@@ -84,10 +61,10 @@
     <main class="main">
       <header class="topbar glass">
         <button class="icon-btn only-mobile" id="openSidebar" aria-label="Open menu"><i data-lucide="menu"></i></button>
-        <div class="logo-plate logo-plate--sm hide-sm"><img src="assets/skynet-logo.png" alt="SKYNET"></div>
+        <div class="logo-plate logo-plate--sm"><img src="assets/skynet-logo.png" alt="SKYNET"></div>
         <div class="topbar-title">
-          <h1 id="viewTitle">Dashboard Overview</h1>
-          <p class="muted">Customer Credit Limit Report · ACTIVE customers with Credit Limit &gt; ₹1</p>
+          <h1 class="main-title">Customer Credit Limit Report</h1>
+          <p class="view-crumb"><i data-lucide="chevron-right"></i><span id="viewTitle">Dashboard Overview</span></p>
         </div>
         <div class="topbar-actions">
           <div class="clock" title="Indian Standard Time"><i data-lucide="clock"></i><span id="clock">--</span></div>
@@ -116,7 +93,7 @@
             <div class="chart-box"><canvas id="ovBucketChart"></canvas></div></article>
         </div>
         <div class="grid-2">
-          <article class="card glass tilt"><header class="card-head"><h3><i data-lucide="trophy"></i> Top 5 Salesmen by Credit Limit</h3><a href="#salesmen" class="link">View all</a></header>
+          <article class="card glass tilt"><header class="card-head"><h3><i data-lucide="trophy"></i> Top 5 Salesmen by Credit Limit</h3><span class="hint">Click a bar for details</span><a href="#salesmen" class="link">View all</a></header>
             <div class="chart-box"><canvas id="ovSalesChart"></canvas></div></article>
           <article class="card glass tilt"><header class="card-head"><h3><i data-lucide="hourglass"></i> Aging Limit Mix</h3><a href="#aging" class="link">Details</a></header>
             <div class="chart-box"><canvas id="ovAgingChart"></canvas></div></article>
@@ -132,7 +109,7 @@
           <article class="card glass tilt"><header class="card-head"><h3><i data-lucide="pie-chart"></i> Credit Share by Hub</h3></header>
             <div class="chart-box"><canvas id="hubDoughnutChart"></canvas></div></article>
         </div>
-        <article class="card glass"><header class="card-head"><h3><i data-lucide="list"></i> Hub-wise Summary</h3></header>
+        <article class="card glass"><header class="card-head"><h3><i data-lucide="list"></i> Hub-wise Summary</h3><span class="hint">Click a hub for full details</span></header>
           <div class="table-wrap"><table class="data-table" id="hubTable"></table></div></article>
       </section>
 
@@ -140,14 +117,14 @@
       <section class="view" id="view-salesmen" data-title="Salesman Analysis">
         <div class="mini-grid" id="salesSummary"></div>
         <div class="grid-2 grid-2--wide">
-          <article class="card glass tilt"><header class="card-head"><h3><i data-lucide="trophy"></i> Top 10 Salesmen by Total Credit Limit</h3></header>
+          <article class="card glass tilt"><header class="card-head"><h3><i data-lucide="trophy"></i> Top 10 Salesmen by Total Credit Limit</h3><span class="hint">Click a bar for details</span></header>
             <div class="chart-box chart-box--tall"><canvas id="salesTopChart"></canvas></div></article>
           <article class="card glass tilt"><header class="card-head"><h3><i data-lucide="users"></i> Customer Count by Salesman</h3></header>
             <div class="chart-box chart-box--tall"><canvas id="salesCountChart"></canvas></div></article>
         </div>
         <article class="card glass tilt"><header class="card-head"><h3><i data-lucide="git-compare"></i> Salesman-wise Comparison – Total vs Average Credit Limit</h3></header>
           <div class="chart-box chart-box--tall"><canvas id="salesCompareChart"></canvas></div></article>
-        <article class="card glass"><header class="card-head"><h3><i data-lucide="list"></i> Salesman-wise Summary</h3></header>
+        <article class="card glass"><header class="card-head"><h3><i data-lucide="list"></i> Salesman-wise Summary</h3><span class="hint">Click a salesman for full details</span></header>
           <div class="table-wrap"><table class="data-table" id="salesTable"></table></div></article>
       </section>
 
@@ -215,6 +192,17 @@
           <article class="card glass">
             <header class="card-head"><h3><i data-lucide="upload-cloud"></i> Upload Customer File</h3></header>
             <div id="uploadGate" class="hidden banner banner--warn"></div>
+            <form id="uploadAuth" class="upload-auth hidden" autocomplete="on">
+              <p><i data-lucide="shield-check"></i> Viewing is open to everyone. <b>Uploading needs an uploader account.</b></p>
+              <div class="upload-auth-row">
+                <label class="field"><span>Username</span><input id="upUser" autocomplete="username" required></label>
+                <label class="field"><span>Password</span><input id="upPass" type="password" autocomplete="current-password" required></label>
+                <button class="btn btn-primary" id="upLoginBtn" type="submit"><i data-lucide="log-in"></i> Sign in to upload</button>
+              </div>
+              <p id="upLoginError" class="form-error" role="alert"></p>
+            </form>
+            <div id="uploaderChip" class="uploader-chip hidden"><i data-lucide="user-check"></i><span id="uploaderName"></span>
+              <button class="btn btn-ghost btn-sm" id="upLogout" type="button"><i data-lucide="log-out"></i> Sign out</button></div>
             <label class="dropzone" id="dropzone" tabindex="0">
               <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" hidden>
               <div class="dz-icon"><i data-lucide="file-up"></i></div>
@@ -278,6 +266,29 @@
   <!-- printable report (filled just before printing) -->
   <div id="printArea" class="print-area" aria-hidden="true"></div>
   <div id="toasts" class="toasts" aria-live="polite"></div>
+
+  <!-- Salesman / Hub detail popup -->
+  <div id="detailModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-card glass">
+      <header class="modal-head">
+        <div class="modal-icon" id="detailIcon"><i data-lucide="briefcase"></i></div>
+        <div><small id="detailType">Salesman</small><h2 id="detailTitle">—</h2></div>
+        <button class="icon-btn" data-close aria-label="Close"><i data-lucide="x"></i></button>
+      </header>
+      <div class="mini-grid" id="detailStats"></div>
+      <div class="detail-break" id="detailBreak"></div>
+      <div class="toolbar">
+        <p class="muted" id="detailInfo"></p>
+        <div class="toolbar-actions">
+          <button class="btn btn-ghost btn-sm" id="detailXlsx"><i data-lucide="file-spreadsheet"></i> Excel</button>
+          <button class="btn btn-ghost btn-sm" id="detailCsv"><i data-lucide="file-text"></i> CSV</button>
+          <button class="btn btn-primary btn-sm" id="detailOpen"><i data-lucide="table-2"></i> Open in Customer Details</button>
+        </div>
+      </div>
+      <div class="table-wrap modal-table"><table class="data-table" id="detailTable"></table></div>
+    </div>
+  </div>
 
   <!-- Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>

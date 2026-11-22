@@ -71,7 +71,7 @@ python -m http.server 8080
 # then open http://localhost:8080
 ```
 
-Default static-mode sign-in: **admin / Skynet@2026**. Change it before going live (section 7).
+There is **no login**: anyone who opens the link can view the dashboard.
 
 ---
 
@@ -95,14 +95,14 @@ Default static-mode sign-in: **admin / Skynet@2026**. Change it before going liv
 
 ## 5. ⚠️ Read before publishing customer data
 
-**GitHub Pages sites are public.** Even if the repository is private, anyone who has the URL can download `data/customers.csv` directly. The static-mode login screen only stops casual visitors and is **not** real security.
+**The dashboard is open to anyone who has the link** (no login, as requested). On GitHub Pages the file `data/customers.csv` can also be downloaded directly by anyone with the URL, even if the repository is private. Only share the link inside the company.
 
 Choose one of these setups:
 
 | Setup | Who can see the data | Shared across devices | Recommended for |
 |---|---|---|---|
-| **A. Secure backend** (section 6) | Only users who sign in | ✅ Yes, instantly | **Live company use** |
-| **B. Static + GitHub upload** (section 8) | Anyone with the URL | ✅ After a commit (~1–2 min) | Non-sensitive or demo data |
+| **A. Backend** (section 6) | Anyone with the link; only *uploaders* can change data | ✅ Yes, instantly | **Live company use** |
+| **B. Static + GitHub upload** (section 8) | Anyone with the URL | ✅ After a commit (~1–2 min) | Simple setup |
 | Browser-only upload (no setup) | Only that browser | ❌ No | Quick checks |
 
 Never commit the full 81-column export. It contains portal passwords, bank account numbers, Aadhaar/PAN files and e-mail addresses. The app and backend only send or store the 7 report columns, and the GitHub Action **fails** if extra columns are pushed.
@@ -111,7 +111,7 @@ Never commit the full 81-column export. It contains portal passwords, bank accou
 
 ## 6. Backend setup (Option A – secure, recommended)
 
-The backend is a free **Google Apps Script web app** connected to a private Google Sheet. It signs users in, serves the data only to signed-in users, re-checks every upload on the server and keeps an upload log. No passwords or tokens are stored in the website code.
+The backend is a free **Google Apps Script web app** connected to a private Google Sheet. It serves the latest data to the dashboard (no login needed to view), lets only **uploader** accounts publish new files, re-checks every upload on the server and keeps an upload log. No passwords or tokens are stored in the website code.
 
 1. Create a new **Google Sheet** (e.g. *SKYNET Credit Limit – Backend*) with the company Google account. Do not share it.
 2. **Extensions → Apps Script.** Delete the sample code and paste the full contents of `backend/Code.gs`. Save.
@@ -127,7 +127,7 @@ The backend is a free **Google Apps Script web app** connected to a private Goog
    To disable a user, set **Active** to `FALSE` in the *Users* sheet.
 5. **Deploy → New deployment → ⚙ Web app**
    * Execute as: **Me**
-   * Who has access: **Anyone** (required so the website can call it; every data request still needs a valid sign-in token)
+   * Who has access: **Anyone** (required so the website can call it; uploads still need an uploader sign-in)
    * **Deploy** → copy the URL that ends in `/exec`.
 6. In GitHub, edit `js/config.js` and paste the URL:
    ```js
@@ -137,7 +137,7 @@ The backend is a free **Google Apps Script web app** connected to a private Goog
    ```text
    NAME,CODE,ORIGIN HUB,CREDIT LIMIT,AGING LIMIT,STATUS,SALESMAN
    ```
-8. Open the site, sign in as the uploader and use **Upload Data** to load the first file. Every user sees it at their next sign-in or **Refresh**.
+8. Open the site → **Upload Data**. A small sign-in box appears there (only for uploading). Sign in with the uploader account and upload the first file. Every user sees it when they open or **Refresh** the dashboard.
 
 **After changing `Code.gs`:** use **Deploy → Manage deployments → ✏ Edit → Version: New version → Deploy** so the `/exec` URL stays the same.
 
@@ -147,17 +147,11 @@ Sessions last up to 6 hours. After 5 wrong passwords, that username is locked fo
 
 ---
 
-## 7. Static-mode sign-in (Option B or local use)
+## 7. Access
 
-Used only when `backendUrl` is empty. To change the password:
-
-1. Open the site, press **F12 → Console** on the login page and run:
-   ```js
-   await SKY.auth.hash('YourNewPassword')
-   ```
-2. Copy the long result into `js/config.js → localAuth.users[0].hash` and commit.
-
-Add more users to the `users` list in the same way. `role: 'viewer'` hides uploading. To remove the login screen completely, set `localAuth.enabled: false`.
+* **Viewing:** no login. Anyone with the link sees the dashboard.
+* **Uploading (backend mode):** the Upload Data page asks for an *uploader* username and password, which the backend checks. Viewer accounts cannot upload.
+* **Uploading (static mode):** anyone can upload, but it only changes **their own browser**. The shared data changes only when `data/customers.csv` is updated in GitHub (section 8).
 
 ---
 
@@ -173,7 +167,11 @@ Add more users to the `users` list in the same way. `role: 'viewer'` hides uploa
 
 ## 9. Features
 
-* **8 animated KPI cards:** eligible customers, total, average, highest and lowest credit limit, origin hubs, salesmen, and customers with a missing aging limit. Numbers count up and cards tilt in 3D.
+* **No login** – open the link and the dashboard loads.
+* **Auto-hide sidebar:** a slim icon rail that expands when the mouse moves over it (tap to open on touch screens).
+* **8 animated KPI cards:** eligible customers, total, average, highest and lowest credit limit, origin hubs, salesmen, and customers with a missing aging limit. Numbers count up; on hover the card tilts in 3D following the mouse, with a light glare and the content lifting forward.
+* **3D charts:** extruded bars, thick 3D doughnuts and soft shadows. Bars grow in one after another; on hover bars glow and doughnut slices pop out with a bounce.
+* **Salesman / Hub details:** click any salesman (bar, table row, or the name in Customer Details) or any hub to open a popup with their customers, totals, average, rank, hub/salesman breakdown, Excel/CSV export and a shortcut to the filtered customer table.
 * **Origin Hub analysis:** customers, total, average and highest per hub, plus the top hub. Includes a bar + line chart and a doughnut chart.
 * **Salesman analysis:** count, total and average per salesman. Shows the top 10, customer counts and a comparison of total vs average. Customers with no salesman appear as *Not Assigned*.
 * **Credit Limit analysis:** 5 ranges (₹1–₹50,000 … above ₹10,00,000) with customer count and exposure for each.
@@ -188,7 +186,7 @@ Add more users to the `users` list in the same way. `role: 'viewer'` hides uploa
   * the current dataset is replaced only after the file passes validation
   * Web Worker for files over 200 KB
 * **Upload details:** last file name, upload date and time (IST), the file's own last-modified time, records imported, eligible and excluded counts, status and who uploaded it.
-* **5 themes** (Dark Premium, Light Professional, Midnight Purple, Ocean Blue, Emerald Green) plus a separate **dark/light toggle**. Both are saved in `localStorage` and apply instantly.
+* **10 themes:** 5 classic (Dark Premium, Light Professional, Midnight Purple, Ocean Blue, Emerald Green) and 5 gradient (Sunset Glow, Aurora, Royal Gold, Neon Cyber, Rose Coral), plus a separate **dark/light toggle**. Both are saved in `localStorage` and apply instantly.
 * **Live IST clock** and a status strip showing file, last upload, eligible records, last refresh time and data source.
 * **Performance:**
   * charts are built only when their page is opened

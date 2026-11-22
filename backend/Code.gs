@@ -3,7 +3,7 @@
    ----------------------------------------------------------------------------
    What it does
      • Signs users in (passwords stored only as salted SHA-256 hashes)
-     • Serves the latest dataset ONLY to signed-in users
+     • Serves the latest dataset to the dashboard (viewing needs no login)
      • Accepts new uploads from "uploader" users, re-validates them on the
        server, stores them in this Google Sheet and logs every upload
      • (Optional) also commits the 7-column CSV to GitHub. The GitHub token
@@ -75,7 +75,7 @@ function doPost(e) {
     switch (body.action) {
       case 'login':   return json_(login_(body));
       case 'logout':  CacheService.getScriptCache().remove('sess_' + body.token); return json_({ ok: true });
-      case 'getData': return json_(getData_(requireSession_(body.token)));
+      case 'getData': return json_(getData_());           // viewing is open to everyone
       case 'upload':  return json_(upload_(requireSession_(body.token, 'uploader'), body));
       default:        return json_({ ok: false, error: 'Unknown action' });
     }
@@ -108,7 +108,7 @@ function login_(body) {
   return { ok: true, token: token, name: session.name, role: session.role, expires: Date.now() + SESSION_SECONDS * 1000 };
 }
 
-function getData_(session) {
+function getData_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sh = ss.getSheetByName(SHEET.data);
   if (sh.getLastRow() < 2) throw new Error('No data has been uploaded yet.');

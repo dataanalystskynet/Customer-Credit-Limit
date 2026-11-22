@@ -23,6 +23,79 @@
     const n = parseInt(h, 16);
     return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`;
   }
+  /* darken / lighten a #hex colour (f < 0 darkens, f > 0 lightens) */
+  function shade(hex, f) {
+    const h = String(hex).trim().replace('#', '');
+    if (h.length !== 6) return 'rgba(0,0,0,.35)';
+    const n = parseInt(h, 16);
+    const ch = v => Math.round(f < 0 ? v * (1 + f) : v + (255 - v) * f);
+    return `rgb(${ch(n >> 16 & 255)},${ch(n >> 8 & 255)},${ch(n & 255)})`;
+  }
+
+  /* ---- Pseudo-3D plugin: extruded bars, thick doughnuts, soft drop shadows ---- */
+  const depth3d = {
+    id: 'depth3d',
+    beforeDatasetDraw(chart, args, opts) {
+      try {
+        const meta = args.meta, ctx = chart.ctx;
+        if (meta.hidden || !opts || opts.enabled === false) return;
+        const type = meta.type;
+        if (type === 'bar') {
+          const horiz = chart.options.indexAxis === 'y';
+          const d = opts.depth || 9, dx = d * .9, dy = -d * .65;
+          const faceTop = opts.top, faceSide = opts.side;
+          meta.data.forEach((el, i) => {
+            const p = el.getProps(['x', 'y', 'base', 'width', 'height'], true);
+            let l, r, t, b;
+            if (!horiz) { l = p.x - p.width / 2; r = p.x + p.width / 2; t = Math.min(p.y, p.base); b = Math.max(p.y, p.base); }
+            else { l = Math.min(p.x, p.base); r = Math.max(p.x, p.base); t = p.y - p.height / 2; b = p.y + p.height / 2; }
+            if (!(r - l > 1) || !(b - t > 1)) return;
+            const active = chart.getActiveElements().some(a => a.datasetIndex === args.index && a.index === i);
+            ctx.save();
+            ctx.globalAlpha = active ? 1 : .92;
+            ctx.beginPath(); ctx.moveTo(r, t); ctx.lineTo(r + dx, t + dy); ctx.lineTo(r + dx, b + dy); ctx.lineTo(r, b); ctx.closePath();
+            ctx.fillStyle = Array.isArray(faceSide) ? faceSide[i % faceSide.length] : faceSide; ctx.fill();
+            ctx.beginPath(); ctx.moveTo(l, t); ctx.lineTo(l + dx, t + dy); ctx.lineTo(r + dx, t + dy); ctx.lineTo(r, t); ctx.closePath();
+            ctx.fillStyle = Array.isArray(faceTop) ? faceTop[i % faceTop.length] : faceTop; ctx.fill();
+            ctx.restore();
+          });
+        } else if (type === 'doughnut' || type === 'pie') {
+          const layers = opts.depth || 14, colors = opts.colors || [];
+          for (let k = layers; k > 0; k--) {
+            meta.data.forEach((arc, i) => {
+              const p = arc.getProps(['x', 'y', 'startAngle', 'endAngle', 'innerRadius', 'outerRadius'], true);
+              const off = ((arc.options && arc.options.offset) || 0) / 4, mid = (p.startAngle + p.endAngle) / 2;
+              const x = p.x + Math.cos(mid) * off, y = p.y + Math.sin(mid) * off + k;
+              ctx.beginPath();
+              ctx.arc(x, y, p.outerRadius, p.startAngle, p.endAngle);
+              ctx.arc(x, y, p.innerRadius, p.endAngle, p.startAngle, true);
+              ctx.closePath();
+              ctx.fillStyle = shade(colors[i % colors.length] || '#888888', k === layers ? -.6 : -.42);
+              ctx.fill();
+            });
+          }
+        } else if (type !== 'polarArea') { return; }
+        ctx.save();
+        ctx.shadowColor = opts.shadow || 'rgba(0,0,0,.35)';
+        ctx.shadowBlur = 16; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 8;
+        chart.$depthSaved = true;
+      } catch (e) { /* never break a chart because of decoration */ }
+    },
+    afterDatasetDraw(chart) {
+      if (chart.$depthSaved) { chart.ctx.restore(); chart.$depthSaved = false; }
+    }
+  };
+
+  /* shared hover animation + click handling */
+  function interaction(onPick) {
+    return {
+      transitions: { active: { animation: { duration: 450, easing: 'easeOutBack' } } },
+      onHover(evt, els) { if (evt.native && evt.native.target) evt.native.target.style.cursor = els.length && onPick ? 'pointer' : 'default'; },
+      onClick(evt, els, chart) { if (onPick && els.length) onPick(chart.data.labels[els[0].index]); }
+    };
+  }
+  const grow = { delay: c => (c.type === 'data' && c.mode === 'default') ? c.dataIndex * 70 : 0, duration: 900, easing: 'easeOutQuart' };
+
   function gradient(ctx, area, c1, c2, horizontal) {
     if (!area) return c1;
     const g = horizontal
@@ -69,10 +142,11 @@
   const gridColor = () => css('--border');
 
   /* --- chart builders --- */
-  function bar(id, { labels, data, label, money, horizontal, colors, secondary }) {
+  function bar(id, { labels, data, label, money, horizontal, colors, secondary, onPick }) {
     const a1 = css('--a1'), a2 = css('--a2');
     const datasets = [{
-      label, data, borderRadius: 8, borderSkipped: false, maxBarThickness: 46,
+      label, data, borderRadius: 4, borderSkipped: false, maxBarThickness: 46,
+      borderWidth: 0, hoverBorderWidth: 3, hoverBorderColor: 'rgba(255,255,255,.85)',
       backgroundColor: colors || (c => gradient(c.chart.ctx, c.chart.chartArea, a1, a2, horizontal)),
       yAxisID: horizontal ? undefined : 'y', xAxisID: horizontal ? 'x' : undefined
     }];
@@ -94,9 +168,13 @@
     return make(id, {
       type: 'bar',
       data: { labels, datasets },
-      options: {
+      plugins: [depth3d],
+      options: Object.assign(interaction(onPick), {
         indexAxis: horizontal ? 'y' : 'x',
+        animation: grow,
+        layout: { padding: { top: 12, right: 14 } },
         plugins: {
+          depth3d: { depth: 9, top: shade(a2, .25), side: shade(a1, -.38) },
           legend: { display: !!secondary },
           tooltip: { callbacks: { label: c => {
             const isSec = secondary && c.datasetIndex === 1;
@@ -105,11 +183,11 @@
           } } }
         },
         scales
-      }
+      })
     });
   }
 
-  function doughnut(id, { labels, data, money, centerLabel }) {
+  function doughnut(id, { labels, data, money, centerLabel, onPick }) {
     const colors = palette(labels.length);
     const total = data.reduce((a, b) => a + b, 0);
     const center = {
@@ -129,29 +207,35 @@
         ctx.restore();
       }
     };
-    return make(id, {
+    const chart = make(id, {
       type: 'doughnut',
-      data: { labels, datasets: [{ data, backgroundColor: colors, borderColor: css('--surface-solid'), borderWidth: 3, hoverOffset: 12 }] },
-      options: {
-        cutout: '66%',
-        layout: { padding: 8 },
+      data: { labels, datasets: [{ data, backgroundColor: colors, borderColor: css('--surface-solid'), borderWidth: 2, hoverOffset: 26, hoverBorderWidth: 0 }] },
+      plugins: [depth3d, center],
+      options: Object.assign(interaction(onPick), {
+        cutout: '62%',
+        layout: { padding: { top: 16, bottom: 22, left: 16, right: 16 } },
+        animation: { animateRotate: true, animateScale: true, duration: 1100, easing: 'easeOutQuart' },
         plugins: {
+          depth3d: { depth: 14, colors },
           legend: { position: window.innerWidth < 640 ? 'bottom' : 'right', labels: { color: css('--text-2'), padding: 12 } },
           tooltip: { callbacks: { label: c => ` ${c.label}: ${money ? fmt(c.raw) : c.raw.toLocaleString('en-IN')} (${total ? (c.raw / total * 100).toFixed(1) : 0}%)` } }
         }
-      },
-      plugins: [center]
+      })
     });
+    return chart;
   }
 
   function polar(id, { labels, data }) {
     const colors = palette(labels.length).map(c => alpha(c, .75));
     return make(id, {
       type: 'polarArea',
-      data: { labels, datasets: [{ data, backgroundColor: colors, borderColor: css('--surface-solid'), borderWidth: 2 }] },
+      data: { labels, datasets: [{ data, backgroundColor: colors, borderColor: css('--surface-solid'), borderWidth: 2, hoverBorderWidth: 4, hoverBorderColor: 'rgba(255,255,255,.8)' }] },
+      plugins: [depth3d],
       options: {
+        transitions: { active: { animation: { duration: 450, easing: 'easeOutBack' } } },
+        animation: { animateRotate: true, animateScale: true, duration: 1100 },
         scales: { r: { grid: { color: gridColor() }, angleLines: { color: gridColor() }, ticks: { display: false } } },
-        plugins: { legend: { position: window.innerWidth < 640 ? 'bottom' : 'right', labels: { color: css('--text-2') } },
+        plugins: { depth3d: {}, legend: { position: window.innerWidth < 640 ? 'bottom' : 'right', labels: { color: css('--text-2') } },
           tooltip: { callbacks: { label: c => ` ${c.label}: ${c.raw} customers` } } }
       }
     });
@@ -166,5 +250,5 @@
   window.addEventListener('resize', debounce(() => registry.forEach(c => c.resize()), 200));
   function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
 
-  SKY.Charts = { applyDefaults, bar, doughnut, polar, destroy, destroyAll, available, palette, markAllDirty, isDirty, clean };
+  SKY.Charts = { depth3d, shade, applyDefaults, bar, doughnut, polar, destroy, destroyAll, available, palette, markAllDirty, isDirty, clean };
 })();

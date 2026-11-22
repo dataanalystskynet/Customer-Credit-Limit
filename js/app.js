@@ -6,7 +6,7 @@
   const C = SKY.config, D = SKY.Dashboard, X = SKY.Excel, F = SKY.Filters;
   const $ = id => document.getElementById(id);
   const esc = D.esc;
-  const VERSION = 'v1.0.0';
+  const VERSION = 'v1.1.0';
   const LS = {
     get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
     set(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } },
@@ -43,12 +43,10 @@
     return data;
   }
 
-  /* ---------------- authentication ---------------- */
+  /* ---------------- uploader sign-in (backend mode only) ----------------
+     Viewing is open to everyone. Only uploading to the shared server needs an
+     "uploader" account, which is checked by the backend (backend/Code.gs). */
   const auth = SKY.auth = {
-    async hash(pw) {
-      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode((C.localAuth.salt || '') + pw));
-      return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
-    },
     session() {
       try {
         const s = JSON.parse(sessionStorage.getItem('sky.session') || 'null');
@@ -58,53 +56,17 @@
     },
     save(s) { sessionStorage.setItem('sky.session', JSON.stringify(s)); },
     clear() { sessionStorage.removeItem('sky.session'); },
-    required() { return backendMode() || (C.localAuth && C.localAuth.enabled); },
     async login(username, password) {
-      const exp = Date.now() + (C.sessionHours || 8) * 3600e3;
-      if (backendMode()) {
-        const r = await api('login', { username, password });
-        const s = { token: r.token, name: r.name, role: r.role, username, exp: r.expires || exp, mode: 'backend' };
-        auth.save(s); return s;
-      }
-      const u = (C.localAuth.users || []).find(x => x.username.toLowerCase() === username.toLowerCase());
-      const h = await auth.hash(password);
-      if (!u || u.hash !== h) throw new Error('Invalid username or password.');
-      const s = { name: u.name, role: u.role, username: u.username, exp, mode: 'local' };
+      const r = await api('login', { username, password });
+      const s = { token: r.token, name: r.name, role: r.role, username, exp: r.expires || Date.now() + 6 * 3600e3 };
       auth.save(s); return s;
     },
     async logout() {
       const s = auth.session();
-      if (s && s.mode === 'backend') { try { await api('logout', { token: s.token }); } catch (e) {} }
-      auth.clear(); location.reload();
+      if (s) { try { await api('logout', { token: s.token }); } catch (e) {} }
+      auth.clear(); refreshUploadGate();
     }
   };
-
-  function showLogin() {
-    $('login').classList.remove('hidden'); $('app').classList.add('hidden');
-    $('loginMode').textContent = backendMode() ? 'Secure server sign-in' : 'Local sign-in';
-    setTimeout(() => $('loginUser').focus(), 300);
-  }
-  function bindLogin() {
-    const attempts = { n: 0, until: 0 };
-    $('togglePass').addEventListener('click', () => {
-      const p = $('loginPass'); p.type = p.type === 'password' ? 'text' : 'password';
-      $('togglePass').innerHTML = `<i data-lucide="${p.type === 'password' ? 'eye' : 'eye-off'}"></i>`; SKY.icons();
-    });
-    $('loginForm').addEventListener('submit', async e => {
-      e.preventDefault();
-      if (Date.now() < attempts.until) { $('loginError').textContent = 'Too many attempts. Please wait 30 seconds.'; return; }
-      const btn = $('loginBtn'); btn.disabled = true; $('loginError').textContent = '';
-      try {
-        await auth.login($('loginUser').value.trim(), $('loginPass').value);
-        $('loginPass').value = '';
-        $('login').classList.add('hidden');
-        await enterApp();
-      } catch (err) {
-        attempts.n++; if (attempts.n >= 5) { attempts.until = Date.now() + 30000; attempts.n = 0; }
-        $('loginError').textContent = err.message === 'Failed to fetch' ? 'Cannot reach the server. Check your internet connection.' : err.message;
-      } finally { btn.disabled = false; }
-    });
-  }
 
   /* ---------------- navigation ---------------- */
   const VIEWS = ['overview', 'hubs', 'salesmen', 'credit', 'aging', 'customers', 'upload', 'export', 'themes'];
@@ -115,7 +77,7 @@
     document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
     document.querySelectorAll('.nav-link').forEach(a => a.classList.toggle('active', a.dataset.view === name));
     $('viewTitle').textContent = $('view-' + name).dataset.title;
-    document.title = $('view-' + name).dataset.title + ' | SKYNET Credit Limit Report';
+    document.title = $('view-' + name).dataset.title + ' | Customer Credit Limit Report – SKYNET';
     $('app').classList.remove('nav-open');
     D.renderView(name);
     if (name === 'export') updateExportInfo();
@@ -126,7 +88,11 @@
     $('openSidebar').addEventListener('click', () => $('app').classList.add('nav-open'));
     $('closeSidebar').addEventListener('click', () => $('app').classList.remove('nav-open'));
     $('scrim').addEventListener('click', () => $('app').classList.remove('nav-open'));
-    $('logoutBtn').addEventListener('click', () => auth.logout());
+    // Touch screens (no hover): tap the rail to open it, tap a link to close it
+    const sb = $('sidebar');
+    sb.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse' && window.innerWidth > 960 && !sb.classList.contains('open')) { sb.classList.add('open'); if (!e.target.closest('.nav-link')) e.preventDefault(); } });
+    sb.addEventListener('click', e => { if (e.target.closest('.nav-link')) sb.classList.remove('open'); });
+    document.addEventListener('pointerdown', e => { if (!e.target.closest('#sidebar')) sb.classList.remove('open'); });
     $('refreshBtn').addEventListener('click', async () => {
       const b = $('refreshBtn'); b.classList.add('spin');
       try { await loadData(true); SKY.toast('Dashboard refreshed with the latest data.', 'ok'); }
@@ -146,7 +112,12 @@
     { id: 'light-pro', name: 'Light Professional', desc: 'White & grey · blue & red', mode: 'light', sw: ['#f4f6fb', '#ffffff', '#1d5fe0', '#e3262b'] },
     { id: 'midnight-purple', name: 'Midnight Purple', desc: 'Deep purple · violet & pink', mode: 'dark', sw: ['#0d0618', '#2d0f3f', '#8b5cf6', '#ec4899'] },
     { id: 'ocean-blue', name: 'Ocean Blue', desc: 'Navy · cyan & electric blue', mode: 'dark', sw: ['#030b1a', '#062a4a', '#22d3ee', '#2563eb'] },
-    { id: 'emerald-green', name: 'Emerald Green', desc: 'Dark green · green & turquoise', mode: 'dark', sw: ['#03120c', '#0a2f2a', '#10b981', '#14b8a6'] }
+    { id: 'emerald-green', name: 'Emerald Green', desc: 'Dark green · green & turquoise', mode: 'dark', sw: ['#03120c', '#0a2f2a', '#10b981', '#14b8a6'] },
+    { id: 'sunset-glow', name: 'Sunset Glow', desc: 'Orange · magenta · gold', mode: 'dark', group: 'gradient', sw: ['#2e0a1f', '#3a1408', '#ff512f', '#dd2476', '#f9a826'] },
+    { id: 'aurora', name: 'Aurora', desc: 'Teal · violet · sky blue', mode: 'dark', group: 'gradient', sw: ['#0d1430', '#08261f', '#00c9a7', '#845ec2', '#4d8cff'] },
+    { id: 'royal-gold', name: 'Royal Gold', desc: 'Navy · gold · amber', mode: 'dark', group: 'gradient', sw: ['#070a1a', '#221a0a', '#f7b733', '#c77d0a', '#ffe08a'] },
+    { id: 'neon-cyber', name: 'Neon Cyber', desc: 'Pink · cyan · purple', mode: 'dark', group: 'gradient', sw: ['#10052a', '#021827', '#f72585', '#4cc9f0', '#7209b7'] },
+    { id: 'rose-coral', name: 'Rose Coral', desc: 'Rose · coral · peach', mode: 'dark', group: 'gradient', sw: ['#2a0f1a', '#2b170c', '#ff6a88', '#ff9a8b', '#ffcc70'] }
   ];
   function applyLook(theme, mode, save = true) {
     const root = document.documentElement;
@@ -165,12 +136,17 @@
     }
   }
   function bindThemes() {
-    $('themeGrid').innerHTML = THEMES.map(t => `
+    const card = t => `
       <button class="theme-card tilt" data-theme="${t.id}">
-        <div class="theme-swatch" style="background:linear-gradient(135deg,${t.sw[0]},${t.sw[1]})">
-          <i style="background:linear-gradient(90deg,${t.sw[2]},${t.sw[3]})"></i><i style="background:${t.sw[3]}"></i><i></i></div>
-        <b>${t.name}</b><small>${t.desc}</small></button>`).join('');
-    $('themeGrid').addEventListener('click', e => {
+        <div class="theme-swatch" style="background:${t.sw[4]
+          ? `radial-gradient(circle at 80% 10%,${t.sw[2]}88,transparent 55%),radial-gradient(circle at 10% 100%,${t.sw[3]}88,transparent 55%),linear-gradient(135deg,${t.sw[0]},${t.sw[1]})`
+          : `linear-gradient(135deg,${t.sw[0]},${t.sw[1]})`}">
+          <i style="background:linear-gradient(90deg,${t.sw.slice(2).join(',')})"></i><i style="background:${t.sw[3]}"></i><i></i></div>
+        <b>${t.name}</b><small>${t.desc}</small></button>`;
+    const grid = $('themeGrid');
+    grid.outerHTML = `<p class="theme-group">Classic themes</p><div class="theme-grid" id="themeGrid">${THEMES.filter(t => !t.group).map(card).join('')}</div>
+      <p class="theme-group">Gradient themes</p><div class="theme-grid" id="themeGrid2">${THEMES.filter(t => t.group).map(card).join('')}</div>`;
+    document.getElementById('view-themes').addEventListener('click', e => {
       const c = e.target.closest('.theme-card'); if (!c) return;
       const t = THEMES.find(x => x.id === c.dataset.theme);
       applyLook(t.id, t.mode);
@@ -197,8 +173,11 @@
       raf = requestAnimationFrame(() => {
         const r = el.getBoundingClientRect();
         const x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5;
-        const max = el.classList.contains('kpi') ? 9 : 3;
-        el.style.transform = `perspective(900px) rotateX(${(-y * max).toFixed(2)}deg) rotateY(${(x * max).toFixed(2)}deg) translateY(-4px)`;
+        const isKpi = el.classList.contains('kpi');
+        const max = isKpi ? 18 : el.classList.contains('card') ? 6 : 8;
+        el.style.transform = `perspective(${isKpi ? 700 : 1100}px) rotateX(${(-y * max).toFixed(2)}deg) rotateY(${(x * max).toFixed(2)}deg) translateY(-6px) scale(${isKpi ? 1.04 : 1.01})`;
+        el.style.setProperty('--mx', ((x + .5) * 100).toFixed(1) + '%');
+        el.style.setProperty('--my', ((y + .5) * 100).toFixed(1) + '%');
       });
     }, { passive: true });
     document.addEventListener('pointerleave', () => { if (active) active.style.transform = ''; }, true);
@@ -207,7 +186,7 @@
   /* ---------------- clock (IST) ---------------- */
   function startClock() {
     const f = new Intl.DateTimeFormat('en-IN', { timeZone: C.timeZone, weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
-    const tick = () => { const s = f.format(new Date()) + ' IST'; $('clock').textContent = s; $('loginClock').textContent = s; };
+    const tick = () => { const s = f.format(new Date()) + ' IST'; $('clock').textContent = s; };
     tick(); setInterval(tick, 1000);
   }
 
@@ -227,14 +206,12 @@
     try { return JSON.parse(LS.get(LOCAL_KEY) || 'null'); } catch (e) { return null; }
   }
   async function loadData(force) {
-    const sess = auth.session();
     $('localBanner').classList.add('hidden');
     if (backendMode()) {
       try {
-        const r = await api('getData', { token: sess && sess.token });
+        const r = await api('getData');
         D.setData(rowsFromCSV(r.csv || ''), Object.assign({}, r.meta || {}, { source: 'Secure server' }));
       } catch (e) {
-        if (e.code === 'AUTH') { auth.clear(); SKY.toast('Your session has expired. Please sign in again.', 'warn'); showLogin(); throw e; }
         if (/No data/i.test(e.message)) { D.setData([], { source: 'Secure server (empty)' }); SKY.toast('No dataset has been uploaded yet.', 'warn'); }
         else throw e;
       }
@@ -297,21 +274,45 @@
   /* ---------------- upload ---------------- */
   let pending = null, uploadBound = false;
   function canUpload() {
+    if (!backendMode()) return true;               // static mode: upload affects this browser only
     const s = auth.session();
-    if (!auth.required()) return true;
     return !!(s && s.role === 'uploader');
+  }
+  function refreshUploadGate() {
+    const dz = $('dropzone'), gate = $('uploadGate'), s = auth.session();
+    gate.classList.add('hidden'); $('uploadAuth').classList.add('hidden'); $('uploaderChip').classList.add('hidden');
+    dz.classList.remove('disabled');
+    if (!backendMode()) {
+      gate.innerHTML = '<i data-lucide="info"></i><span><b>Static mode:</b> uploads refresh the dashboard in <b>this browser only</b>. To share data with all users, configure the secure backend or publish <code>data/customers.csv</code> to GitHub (see README).</span>';
+      gate.classList.remove('hidden');
+    } else if (!s) {
+      dz.classList.add('disabled');
+      $('uploadAuth').classList.remove('hidden');
+    } else if (s.role !== 'uploader') {
+      dz.classList.add('disabled');
+      gate.innerHTML = '<i data-lucide="lock"></i><span>This account can view reports but cannot upload data. Please contact the administrator.</span>';
+      gate.classList.remove('hidden');
+      $('uploaderChip').classList.remove('hidden'); $('uploaderName').textContent = s.name || s.username;
+    } else {
+      $('uploaderChip').classList.remove('hidden'); $('uploaderName').textContent = 'Signed in as ' + (s.name || s.username) + ' (uploader)';
+    }
+    SKY.icons();
   }
   function bindUpload() {
     if (uploadBound) return; uploadBound = true;
     const dz = $('dropzone'), input = $('fileInput');
-    if (!canUpload()) {
-      dz.classList.add('disabled');
-      $('uploadGate').innerHTML = '<i data-lucide="lock"></i><span>Your account can view reports but cannot upload data. Please contact the administrator.</span>';
-      $('uploadGate').classList.remove('hidden');
-    } else if (!backendMode()) {
-      $('uploadGate').innerHTML = '<i data-lucide="info"></i><span><b>Static mode:</b> uploads refresh the dashboard in <b>this browser only</b>. To share data with all users, configure the secure backend or publish <code>data/customers.csv</code> to GitHub (see README).</span>';
-      $('uploadGate').classList.remove('hidden');
-    }
+    refreshUploadGate();
+    $('uploadAuth').addEventListener('submit', async e => {
+      e.preventDefault();
+      const btn = $('upLoginBtn'); btn.disabled = true; $('upLoginError').textContent = '';
+      try {
+        await auth.login($('upUser').value.trim(), $('upPass').value);
+        $('upPass').value = ''; refreshUploadGate(); SKY.toast('Signed in. You can upload now.', 'ok');
+      } catch (err) {
+        $('upLoginError').textContent = err.message === 'Failed to fetch' ? 'Cannot reach the server. Check your internet connection.' : err.message;
+      } finally { btn.disabled = false; }
+    });
+    $('upLogout').addEventListener('click', () => auth.logout());
     $('confirmLabel').textContent = backendMode() ? 'Publish to server & refresh dashboard' : 'Apply & refresh dashboard';
     ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('drag'); }));
     ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('drag'); }));
@@ -368,7 +369,7 @@
     const csv = X.toCSV(ds.rows.map(r => Object.assign({}, r, { creditLimit: r.creditLimit == null ? '' : r.creditLimit, agingLimit: r.agingLimit == null ? '' : r.agingLimit })));
     const meta = {
       fileName: ds.fileName, fileModified: ds.fileModified, uploadedAt: new Date().toISOString(),
-      uploadedBy: sess ? sess.name || sess.username : 'Local user', totalRecords: res.total, eligible: res.eligible.length,
+      uploadedBy: sess ? sess.name || sess.username : 'This browser', totalRecords: res.total, eligible: res.eligible.length,
       excluded: res.excluded, status: 'Success'
     };
     try {
@@ -376,7 +377,7 @@
         $('uploadProgress').classList.remove('hidden');
         const r = await api('upload', { token: sess && sess.token, csv, meta });
         D.setData(ds.rows, Object.assign({}, r.meta || meta, { source: 'Secure server' }));
-        $('uploadMsg').innerHTML = msg('ok', `<b>Published successfully.</b> All authorised users will see this data on their next refresh.${r.github ? ' GitHub copy updated as well.' : ''}`);
+        $('uploadMsg').innerHTML = msg('ok', `<b>Published successfully.</b> Everyone will see this data when they open or refresh the dashboard.${r.github ? ' GitHub copy updated as well.' : ''}`);
       } else {
         const saved = LS.set(LOCAL_KEY, JSON.stringify({ csv, meta }));
         D.setData(ds.rows, Object.assign({}, meta, { source: 'Local upload (this browser only)' }));
@@ -397,22 +398,17 @@
       SKY.icons();
       SKY.toast(`Dashboard updated – ${SKY.fmt.num(res.eligible.length)} eligible customers.`, 'ok');
     } catch (err) {
-      if (err.code === 'AUTH') { auth.clear(); showLogin(); }
+      if (err.code === 'AUTH') { auth.clear(); refreshUploadGate(); }
       $('uploadMsg').innerHTML = msg('err', '<b>Upload failed – the current dataset was NOT changed.</b><br>' + esc(err.message)); SKY.icons();
     } finally { btn.disabled = false; $('uploadProgress').classList.add('hidden'); }
   }
 
   /* ---------------- enter app / boot ---------------- */
   async function enterApp() {
-    const s = auth.session() || { name: 'Guest', role: 'uploader' };
-    $('userName').textContent = s.name || s.username;
-    $('userRole').textContent = s.role === 'uploader' ? 'Administrator / Uploader' : 'Viewer';
-    $('userAvatar').textContent = (s.name || s.username || 'U').trim().charAt(0).toUpperCase();
-    if (!auth.required()) $('logoutBtn').classList.add('hidden');
     $('loader').classList.remove('done');
     $('loaderText').textContent = 'Loading credit limit data…';
     try { await loadData(); }
-    catch (e) { if (e.code === 'AUTH') { $('loader').classList.add('done'); return; } SKY.toast('Could not load data: ' + e.message, 'err', 8000); D.setData([], { source: 'Error' }); updateMeta(); }
+    catch (e) { SKY.toast('Could not load data: ' + e.message, 'err', 8000); D.setData([], { source: 'Error' }); updateMeta(); }
     bindUpload();
     $('app').classList.remove('hidden');
     showView(location.hash.slice(1) || 'overview');
@@ -423,14 +419,9 @@
   async function boot() {
     $('footVersion').textContent = VERSION;
     SKY.Charts.applyDefaults();
-    bindThemes(); bindNav(); bindLogin(); D.bindTable(); bindTilt(); startClock();
+    bindThemes(); bindNav(); D.bindTable(); D.bindDetail(); bindTilt(); startClock();
     SKY.icons();
-    if (auth.required() && !auth.session()) {
-      showLogin();
-      setTimeout(() => $('loader').classList.add('done'), 400);
-    } else {
-      await enterApp();
-    }
+    await enterApp();   // no login – anyone with the link can view
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();

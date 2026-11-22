@@ -82,6 +82,7 @@
     const k = state.analytics.kpi;
     $('kpiGrid').innerHTML = KPI_DEFS.map((d, i) => `
       <article class="kpi tilt" data-k="${i}" style="--i:${i}">
+        <div class="kpi-bg"><span class="kpi-glare"></span></div>
         <div class="kpi-top"><span class="kpi-label">${d.label}</span><span class="kpi-icon"><i data-lucide="${d.icon}"></i></span></div>
         <div class="kpi-value" data-count="${k[d.key]}" data-money="${d.money ? 1 : 0}">${d.money ? '₹0' : '0'}</div>
         <div class="kpi-sub">${esc(d.sub(k))}</div>
@@ -109,7 +110,7 @@
     el.innerHTML = `
       <thead><tr><th>#</th><th>${firstCol}</th><th class="num">Customers</th><th class="num">Total Credit Limit</th>
         <th class="num">Average</th>${opts.noMax ? '' : '<th class="num">Highest</th>'}<th>Share of Exposure</th></tr></thead>
-      <tbody>${rows.length ? rows.map((r, i) => `<tr>
+      <tbody>${rows.length ? rows.map((r, i) => `<tr${opts.type ? ` class="clickable" data-type="${opts.type}" data-group="${esc(r.label)}" title="Click for full details"` : ''}>
         <td class="muted">${i + 1}</td><td><b>${esc(r.label)}</b></td>
         <td class="num">${SKY.fmt.num(r.count)}</td><td class="num amount">${SKY.fmt.inr(r.total)}</td>
         <td class="num">${r.count ? SKY.fmt.inr(r.total / r.count) : '—'}</td>
@@ -128,10 +129,10 @@
   const views = {
     overview() {
       const a = state.analytics;
-      SKY.Charts.doughnut('ovHubChart', { labels: a.hubs.map(h => h.label), data: a.hubs.map(h => h.total), money: true, centerLabel: 'Total credit' });
+      SKY.Charts.doughnut('ovHubChart', { labels: a.hubs.map(h => h.label), data: a.hubs.map(h => h.total), money: true, centerLabel: 'Total credit', onPick: l => showDetail('hub', l) });
       SKY.Charts.bar('ovBucketChart', { labels: a.buckets.map(b => b.label), data: a.buckets.map(b => b.count), label: 'Customers' });
       const top5 = a.salesmen.slice(0, 5);
-      SKY.Charts.bar('ovSalesChart', { labels: top5.map(s => s.label), data: top5.map(s => s.total), label: 'Total credit limit', money: true, horizontal: true });
+      SKY.Charts.bar('ovSalesChart', { labels: top5.map(s => s.label), data: top5.map(s => s.total), label: 'Total credit limit', money: true, horizontal: true, onPick: l => showDetail('salesman', l) });
       const ag = a.aging.filter(x => x.count);
       SKY.Charts.polar('ovAgingChart', { labels: ag.map(x => x.label), data: ag.map(x => x.count) });
     },
@@ -146,10 +147,10 @@
         { icon: 'users', label: 'Most customers', value: byCount ? byCount.label : '—', sub: byCount ? byCount.count + ' customers' : '' },
         { icon: 'calculator', label: 'Highest average', value: byAvg ? byAvg.label : '—', sub: byAvg ? SKY.fmt.inr(byAvg.avg) : '' }
       ]);
-      SKY.Charts.bar('hubBarChart', { labels: h.map(x => x.label), data: h.map(x => x.total), label: 'Total credit limit', money: true,
+      SKY.Charts.bar('hubBarChart', { labels: h.map(x => x.label), data: h.map(x => x.total), label: 'Total credit limit', money: true, onPick: l => showDetail('hub', l),
         secondary: { label: 'Customers', data: h.map(x => x.count) } });
-      SKY.Charts.doughnut('hubDoughnutChart', { labels: h.map(x => x.label), data: h.map(x => x.total), money: true, centerLabel: 'Total credit' });
-      summaryTable($('hubTable'), 'Origin Hub', h);
+      SKY.Charts.doughnut('hubDoughnutChart', { labels: h.map(x => x.label), data: h.map(x => x.total), money: true, centerLabel: 'Total credit', onPick: l => showDetail('hub', l) });
+      summaryTable($('hubTable'), 'Origin Hub', h, { type: 'hub' });
     },
     salesmen() {
       const s = state.analytics.salesmen;
@@ -164,12 +165,12 @@
         { icon: 'user-x', label: 'Not assigned', value: unassigned ? unassigned.count + ' customers' : '0', sub: unassigned ? SKY.fmt.inr(unassigned.total) : '' }
       ]);
       const top10 = s.slice(0, 10);
-      SKY.Charts.bar('salesTopChart', { labels: top10.map(x => x.label), data: top10.map(x => x.total), label: 'Total credit limit', money: true, horizontal: true });
+      SKY.Charts.bar('salesTopChart', { labels: top10.map(x => x.label), data: top10.map(x => x.total), label: 'Total credit limit', money: true, horizontal: true, onPick: l => showDetail('salesman', l) });
       const byC = s.slice().sort((x, y) => y.count - x.count);
-      SKY.Charts.bar('salesCountChart', { labels: byC.map(x => x.label), data: byC.map(x => x.count), label: 'Customers', horizontal: true });
-      SKY.Charts.bar('salesCompareChart', { labels: s.map(x => x.label), data: s.map(x => x.total), label: 'Total credit limit', money: true,
+      SKY.Charts.bar('salesCountChart', { labels: byC.map(x => x.label), data: byC.map(x => x.count), label: 'Customers', horizontal: true, onPick: l => showDetail('salesman', l) });
+      SKY.Charts.bar('salesCompareChart', { labels: s.map(x => x.label), data: s.map(x => x.total), label: 'Total credit limit', money: true, onPick: l => showDetail('salesman', l),
         secondary: { label: 'Average credit limit', data: s.map(x => Math.round(x.avg)), money: true } });
-      summaryTable($('salesTable'), 'Salesman', s);
+      summaryTable($('salesTable'), 'Salesman', s, { type: 'salesman' });
     },
     credit() {
       const b = state.analytics.buckets, k = state.analytics.kpi;
@@ -248,7 +249,7 @@
         <td class="num amount">${SKY.fmt.inr(r.creditLimit)}</td>
         <td>${r.agingLimit == null ? '<span class="badge badge--na">Not Available</span>' : `<span class="badge badge--days">${r.agingLimit} days</span>`}</td>
         <td><span class="badge badge--active">${esc(r.status)}</span></td>
-        <td>${r.salesman ? esc(r.salesman) : `<span class="muted">${F.NOT_ASSIGNED}</span>`}</td></tr>`).join('')
+        <td><button class="link-btn" data-type="salesman" data-group="${esc(F.salesmanKey(r))}" title="View all customers of this salesman">${r.salesman ? esc(r.salesman) : `<span class="muted">${F.NOT_ASSIGNED}</span>`}</button></td></tr>`).join('')
       : `<tr><td colspan="8" class="empty">No customers match the current filters.</td></tr>`;
     el.innerHTML = head + '<tbody>' + body + '</tbody>';
     const total = state.filtered.reduce((s, r) => s + r.creditLimit, 0);
@@ -320,13 +321,13 @@
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   }
-  function exportCSV() {
-    const rows = exportRows(state.filtered);
+  function exportCSV(src, tag) {
+    const rows = exportRows(src || state.filtered);
     if (!rows.length) return SKY.toast('Nothing to export – no customers match the filters.', 'warn');
     const cols = Object.keys(rows[0]);
     const e = v => { const s = v == null ? '' : String(v); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
     const csv = '﻿' + [cols.join(','), ...rows.map(r => cols.map(c => e(r[c])).join(','))].join('\r\n');
-    download(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `SKYNET_Credit_Limit_Customers_${SKY.fmt.stamp()}.csv`);
+    download(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `SKYNET_Credit_Limit_${tag || 'Customers'}_${SKY.fmt.stamp()}.csv`);
     SKY.toast(`Exported ${rows.length} customers to CSV.`, 'ok');
   }
   function sheetFrom(XLSX, rows, widths, moneyCols) {
@@ -344,11 +345,11 @@
     }
     return ws;
   }
-  async function exportXLSX(summary) {
+  async function exportXLSX(summary, src, tag) {
     let XLSX;
     try { XLSX = await SKY.Excel.ensureSheetJS(); } catch (e) { return SKY.toast('Excel library could not be loaded. Use CSV export instead.', 'err'); }
     const wb = XLSX.utils.book_new();
-    const cust = exportRows(summary ? state.eligible : state.filtered);
+    const cust = exportRows(summary ? state.eligible : (src || state.filtered));
     if (!cust.length) return SKY.toast('Nothing to export – no customers match the filters.', 'warn');
     if (summary) {
       const k = state.analytics.kpi, m = state.meta || {};
@@ -373,7 +374,7 @@
       XLSX.utils.book_append_sheet(wb, sheetFrom(XLSX, grp(a.aging.map(b => Object.assign({}, b, { share: b.total / tot })), 'Aging Limit'), [18, 12, 20, 20, 10], ['Total Credit Limit', 'Average Credit Limit']), 'Aging Limits');
     }
     XLSX.utils.book_append_sheet(wb, sheetFrom(XLSX, cust, [42, 12, 16, 16, 14, 10, 20], ['Credit Limit']), summary ? 'Eligible Customers' : 'Customers');
-    XLSX.writeFile(wb, `SKYNET_Credit_Limit_${summary ? 'Analytics' : 'Customers'}_${SKY.fmt.stamp()}.xlsx`);
+    XLSX.writeFile(wb, `SKYNET_Credit_Limit_${summary ? 'Analytics' : (tag || 'Customers')}_${SKY.fmt.stamp()}.xlsx`);
     SKY.toast(`Excel file created with ${cust.length} customers.`, 'ok');
   }
   function printReport() {
@@ -406,5 +407,65 @@
     else if (kind === 'print') printReport();
   }
 
-  SKY.Dashboard = { setData, renderView, bindTable, resetFilters, setTableFilter, exportAction, state, esc };
+  /* ---------------- Salesman / Hub detail popup ---------------- */
+  let detail = null;
+  function showDetail(type, label) {
+    if (!state.eligible.length || !label) return;
+    const keyFn = type === 'hub' ? F.hubKey : F.salesmanKey;
+    const rows = state.eligible.filter(r => keyFn(r).toUpperCase() === String(label).toUpperCase())
+      .sort((a, b) => b.creditLimit - a.creditLimit);
+    if (!rows.length) return;
+    detail = { type, label, rows };
+    const total = rows.reduce((s, r) => s + r.creditLimit, 0);
+    const grand = state.analytics.kpi.totalCredit || 1;
+    const sameType = type === 'hub' ? state.analytics.hubs : state.analytics.salesmen;
+    const rank = sameType.findIndex(g => g.label.toUpperCase() === String(label).toUpperCase()) + 1;
+    const missing = rows.filter(r => r.agingLimit == null).length;
+    $('detailType').textContent = type === 'hub' ? 'Origin Hub' : 'Salesman';
+    $('detailTitle').textContent = label;
+    $('detailIcon').innerHTML = `<i data-lucide="${type === 'hub' ? 'map-pin' : 'briefcase'}"></i>`;
+    minis($('detailStats'), [
+      { icon: 'users', label: 'Customers', value: SKY.fmt.num(rows.length), sub: `Rank #${rank} of ${sameType.length} by credit` },
+      { icon: 'wallet', label: 'Total credit limit', value: SKY.fmt.inr(total), sub: SKY.fmt.pct(total / grand) + ' of total exposure' },
+      { icon: 'calculator', label: 'Average credit limit', value: SKY.fmt.inr(total / rows.length), sub: 'Highest ' + SKY.fmt.inr(rows[0].creditLimit) },
+      { icon: 'alert-triangle', label: 'Blank aging limit', value: SKY.fmt.num(missing) + ' customers', sub: 'Lowest limit ' + SKY.fmt.inr(rows[rows.length - 1].creditLimit) }
+    ]);
+    // breakdown chips: hubs for a salesman, salesmen for a hub
+    const other = type === 'hub' ? F.salesmanKey : F.hubKey;
+    const groups = {};
+    rows.forEach(r => { const k = other(r); groups[k] = groups[k] || { n: 0, t: 0 }; groups[k].n++; groups[k].t += r.creditLimit; });
+    $('detailBreak').innerHTML = `<span class="chip"><i data-lucide="${type === 'hub' ? 'briefcase' : 'map-pin'}"></i>${type === 'hub' ? 'Salesmen' : 'Origin hubs'}:</span>` +
+      Object.entries(groups).sort((a, b) => b[1].t - a[1].t).map(([k, g]) => `<span class="chip">${esc(k)} <b>${g.n}</b> · ${SKY.fmt.inrShort(g.t)}</span>`).join('');
+    $('detailInfo').innerHTML = `All <b>${rows.length}</b> eligible customers of <b>${esc(label)}</b>, highest credit limit first`;
+    $('detailTable').innerHTML = `<thead><tr><th>#</th><th>Name</th><th>Code</th><th>Origin Hub</th><th class="num">Credit Limit</th><th>Aging Limit</th><th>Status</th><th>Salesman</th></tr></thead><tbody>` +
+      rows.map((r, i) => `<tr><td class="muted">${i + 1}</td><td class="name">${esc(r.name)}</td><td><span class="code">${esc(r.code)}</span></td>
+        <td>${esc(F.hubKey(r))}</td><td class="num amount">${SKY.fmt.inr(r.creditLimit)}</td>
+        <td>${r.agingLimit == null ? '<span class="badge badge--na">Not Available</span>' : `<span class="badge badge--days">${r.agingLimit} days</span>`}</td>
+        <td><span class="badge badge--active">${esc(r.status)}</span></td><td>${esc(F.salesmanKey(r))}</td></tr>`).join('') +
+      `</tbody><tfoot><tr><td></td><td>Total</td><td></td><td></td><td class="num">${SKY.fmt.inr(total)}</td><td colspan="3"></td></tr></tfoot>`;
+    $('detailModal').classList.remove('hidden');
+    document.body.classList.add('modal-open');
+    SKY.icons();
+    $('detailModal').querySelector('.modal-head .icon-btn').focus();
+  }
+  function closeDetail() { $('detailModal').classList.add('hidden'); document.body.classList.remove('modal-open'); }
+  function bindDetail() {
+    $('detailModal').addEventListener('click', e => { if (e.target.closest('[data-close]')) closeDetail(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('detailModal').classList.contains('hidden')) closeDetail(); });
+    document.addEventListener('click', e => {
+      const el = e.target.closest('[data-group][data-type]');
+      if (el && !el.closest('#detailModal')) showDetail(el.dataset.type, el.dataset.group);
+    });
+    const tag = () => (detail.type === 'hub' ? 'Hub_' : 'Salesman_') + detail.label.replace(/[^\w]+/g, '_');
+    $('detailCsv').addEventListener('click', () => detail && exportCSV(detail.rows, tag()));
+    $('detailXlsx').addEventListener('click', () => detail && exportXLSX(false, detail.rows, tag()));
+    $('detailOpen').addEventListener('click', () => {
+      if (!detail) return;
+      closeDetail();
+      setTableFilter(detail.type === 'hub' ? { hub: detail.label } : { salesman: detail.label });
+      location.hash = 'customers';
+    });
+  }
+
+  SKY.Dashboard = { setData, renderView, bindTable, bindDetail, showDetail, resetFilters, setTableFilter, exportAction, state, esc };
 })();
