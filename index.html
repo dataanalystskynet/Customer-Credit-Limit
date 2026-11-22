@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark-premium" data-mode="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="description" content="SKYNET Worldwide Express – Customer Credit Limit Report">
+  <title>Customer Credit Limit Report | SKYNET Worldwide Express</title>
+  <link rel="icon" type="image/png" href="assets/skynet-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    /* Apply the saved theme before first paint (prevents a flash of the wrong theme) */
+    try {
+      var t = localStorage.getItem('sky.theme'), m = localStorage.getItem('sky.mode');
+      if (t) document.documentElement.dataset.theme = t;
+      if (m) document.documentElement.dataset.mode = m;
+    } catch (e) {}
+  </script>
+</head>
+<body>
+  <canvas id="bg3d" aria-hidden="true"></canvas>
+
+  <!-- ============ LOADER ============ -->
+  <div id="loader" class="loader" role="status" aria-live="polite">
+    <div class="loader-card">
+      <div class="logo-plate logo-plate--lg"><img src="assets/skynet-logo.png" alt="SKYNET Worldwide Express"></div>
+      <div class="orbit"><span></span><span></span><span></span></div>
+      <p id="loaderText">Loading credit limit data…</p>
+    </div>
+  </div>
+
+  <!-- ============ LOGIN ============ -->
+  <section id="login" class="login hidden" aria-label="Sign in">
+    <form id="loginForm" class="login-card glass" autocomplete="on">
+      <div class="logo-plate logo-plate--lg"><img src="assets/skynet-logo.png" alt="SKYNET Worldwide Express"></div>
+      <h1>Customer Credit Limit Report</h1>
+      <p class="muted">Authorised SKYNET staff only. Please sign in to continue.</p>
+      <label class="field"><span>Username</span>
+        <div class="input-icon"><i data-lucide="user"></i><input id="loginUser" name="username" autocomplete="username" required></div>
+      </label>
+      <label class="field"><span>Password</span>
+        <div class="input-icon"><i data-lucide="lock"></i><input id="loginPass" name="password" type="password" autocomplete="current-password" required>
+          <button type="button" class="icon-btn ghost" id="togglePass" aria-label="Show password"><i data-lucide="eye"></i></button></div>
+      </label>
+      <p id="loginError" class="form-error" role="alert"></p>
+      <button class="btn btn-primary btn-block" id="loginBtn" type="submit"><i data-lucide="log-in"></i> Sign in</button>
+      <p class="login-foot"><span id="loginMode"></span> · <span id="loginClock"></span></p>
+    </form>
+  </section>
+
+  <!-- ============ APP SHELL ============ -->
+  <div id="app" class="app hidden">
+    <aside id="sidebar" class="sidebar glass" aria-label="Main navigation">
+      <div class="sidebar-head">
+        <div class="logo-plate"><img src="assets/skynet-logo.png" alt="SKYNET Worldwide Express"></div>
+        <button class="icon-btn ghost only-mobile" id="closeSidebar" aria-label="Close menu"><i data-lucide="x"></i></button>
+      </div>
+      <nav class="nav">
+        <p class="nav-title">Analytics</p>
+        <a href="#overview" data-view="overview" class="nav-link active"><i data-lucide="layout-dashboard"></i><span>Dashboard Overview</span></a>
+        <a href="#hubs" data-view="hubs" class="nav-link"><i data-lucide="map-pin"></i><span>Origin Hub Analysis</span></a>
+        <a href="#salesmen" data-view="salesmen" class="nav-link"><i data-lucide="briefcase"></i><span>Salesman Analysis</span></a>
+        <a href="#credit" data-view="credit" class="nav-link"><i data-lucide="indian-rupee"></i><span>Credit Limit Analysis</span></a>
+        <a href="#aging" data-view="aging" class="nav-link"><i data-lucide="hourglass"></i><span>Aging Limit Analysis</span></a>
+        <a href="#customers" data-view="customers" class="nav-link"><i data-lucide="table-2"></i><span>Customer Details</span><b class="nav-badge" id="navCount">0</b></a>
+        <p class="nav-title">Data &amp; Settings</p>
+        <a href="#upload" data-view="upload" class="nav-link"><i data-lucide="upload-cloud"></i><span>Upload Data</span></a>
+        <a href="#export" data-view="export" class="nav-link"><i data-lucide="file-down"></i><span>Export Reports</span></a>
+        <a href="#themes" data-view="themes" class="nav-link"><i data-lucide="palette"></i><span>Theme Settings</span></a>
+      </nav>
+      <div class="sidebar-foot">
+        <div class="user-chip"><div class="avatar" id="userAvatar">A</div>
+          <div><b id="userName">User</b><small id="userRole">Viewer</small></div>
+          <button class="icon-btn ghost" id="logoutBtn" title="Sign out" aria-label="Sign out"><i data-lucide="log-out"></i></button>
+        </div>
+        <small class="muted">© SKYNET Worldwide Express</small>
+      </div>
+    </aside>
+    <div class="scrim" id="scrim"></div>
+
+    <main class="main">
+      <header class="topbar glass">
+        <button class="icon-btn only-mobile" id="openSidebar" aria-label="Open menu"><i data-lucide="menu"></i></button>
+        <div class="logo-plate logo-plate--sm hide-sm"><img src="assets/skynet-logo.png" alt="SKYNET"></div>
+        <div class="topbar-title">
+          <h1 id="viewTitle">Dashboard Overview</h1>
+          <p class="muted">Customer Credit Limit Report · ACTIVE customers with Credit Limit &gt; ₹1</p>
+        </div>
+        <div class="topbar-actions">
+          <div class="clock" title="Indian Standard Time"><i data-lucide="clock"></i><span id="clock">--</span></div>
+          <button class="icon-btn" id="modeToggle" title="Toggle dark / light mode" aria-label="Toggle dark or light mode"><i data-lucide="moon"></i></button>
+          <button class="icon-btn" id="refreshBtn" title="Reload latest published data" aria-label="Reload data"><i data-lucide="refresh-cw"></i></button>
+        </div>
+      </header>
+
+      <!-- data status strip -->
+      <section class="status-strip glass" aria-label="Data status">
+        <div><i data-lucide="file-spreadsheet"></i><span>Last file</span><b id="stFile">—</b></div>
+        <div><i data-lucide="calendar-check"></i><span>Last successful upload (IST)</span><b id="stUpload">—</b></div>
+        <div><i data-lucide="users"></i><span>Eligible records</span><b id="stEligible">—</b></div>
+        <div><i data-lucide="refresh-ccw"></i><span>Dashboard refreshed</span><b id="stRefresh">—</b></div>
+        <div><i data-lucide="database"></i><span>Data source</span><b id="stSource">—</b></div>
+      </section>
+      <div id="localBanner" class="banner hidden"></div>
+
+      <!-- ---------- OVERVIEW ---------- -->
+      <section class="view active" id="view-overview" data-title="Dashboard Overview">
+        <div class="kpi-grid" id="kpiGrid"></div>
+        <div class="grid-2">
+          <article class="card glass tilt"><header class="card-head"><h3><i data-lucide="map-pin"></i> Credit Exposure by Origin Hub</h3></header>
+            <div class="chart-box"><canvas id="ovHubChart"></canvas></div></article>
+          <article class="card glass tilt"><header class="card-head"><h3><i data-lucide="layers"></i> Customers by Credit Limit Range</h3></header>
+            <div class="chart-box"><canvas id="ovBucketChart"></canvas></div></article>
+        </div>
+        <div class="grid-2">
+          <article class="card glass tilt"><header class="card-head"><h3><i data-lucide="trophy"></i> Top 5 Salesmen by Credit Limit</h3><a href="#salesmen" class="link">View all</a></header>
+            <div class="chart-box"><canvas id="ovSalesChart"></canvas></div></article>
+          <article class="card glass tilt"><header class="card-head"><h3><i data-lucide="hourglass"></i> Aging Limit Mix</h3><a href="#aging" class="link">Details</a></header>
+            <div class="chart-box"><canvas id="ovAgingChart"></canvas></div></article>
+        </div>
+      </section>
+
+      <!-- ---------- HUBS ---------- -->
+      <section class="view" id="view-hubs" data-title="Origin Hub Analysis">
+        <div class="mini-grid" id="hubSummary"></div>
+        <div class="grid-2 grid-2--wide">
+          <article class="card glass tilt"><header class="card-head"><h3><i data-lucide="bar-chart-3"></i> Customers &amp; Total Credit by Hub</h3></header>
+            <div class="chart-box"><canvas id="hubBarChart"></canvas></div></article>
+          <article class="card glass tilt"><header class="card-head"><h3><i data-lucide="pie-chart"></i> Credit Share by Hub</h3></header>
+            <div class="chart-box"><canvas id="hubDoughnutChart"></canvas></div></article>
+        </div>
+        <article class="card glass"><header class="card-head"><h3><i data-lucide="list"></i> Hub-wise Summary</h3></header>
+          <div class="table-wrap"><table class="data-table" id="hubTable"></table></div></article>
+      </section>
+
+      <!-- ---------- SALESMEN ---------- -->
+      <section class="view" id="view-salesmen" data-title="Salesman Analysis">
+        <div class="mini-grid" id="salesSummary"></div>
+        <div class="grid-2 grid-2--wide">
+          <article class="card glass tilt"><header class="card-head"><h3><i data-lucide="trophy"></i> Top 10 Salesmen by Total Credit Limit</h3></header>
+            <div class="chart-box chart-box--tall"><canvas id="salesTopChart"></canvas></div></article>
+          <article class="card glass tilt"><header class="card-head"><h3><i data-lucide="users"></i> Customer Count by Salesman</h3></header>
+            <div class="chart-box chart-box--tall"><canvas id="salesCountChart"></canvas></div></article>
+        </div>
+        <article class="card glass tilt"><header class="card-head"><h3><i data-lucide="git-compare"></i> Salesman-wise Comparison – Total vs Average Credit Limit</h3></header>
+          <div class="chart-box chart-box--tall"><canvas id="salesCompareChart"></canvas></div></article>
+        <article class="card glass"><header class="card-head"><h3><i data-lucide="list"></i> Salesman-wise Summary</h3></header>
+          <div class="table-wrap"><table class="data-table" id="salesTable"></table></div></article>
+      </section>
+
+      <!-- ---------- CREDIT ---------- -->
+      <section class="view" id="view-credit" data-title="Credit Limit Analysis">
+        <div class="mini-grid" id="creditSummary"></div>
+        <div class="grid-2">
+          <article class="card glass tilt"><header class="card-head"><h3><i data-lucide="bar-chart-3"></i> Customer Count by Credit Range</h3></header>
+            <div class="chart-box"><canvas id="creditCountChart"></canvas></div></article>
+          <article class="card glass tilt"><header class="card-head"><h3><i data-lucide="pie-chart"></i> Total Credit Exposure by Range</h3></header>
+            <div class="chart-box"><canvas id="creditExposureChart"></canvas></div></article>
+        </div>
+        <article class="card glass"><header class="card-head"><h3><i data-lucide="list"></i> Credit Range Summary</h3></header>
+          <div class="table-wrap"><table class="data-table" id="creditTable"></table></div></article>
+      </section>
+
+      <!-- ---------- AGING ---------- -->
+      <section class="view" id="view-aging" data-title="Aging Limit Analysis">
+        <div class="mini-grid" id="agingSummary"></div>
+        <div class="grid-2">
+          <article class="card glass tilt"><header class="card-head"><h3><i data-lucide="bar-chart-3"></i> Customers by Aging Limit</h3></header>
+            <div class="chart-box"><canvas id="agingCountChart"></canvas></div></article>
+          <article class="card glass tilt"><header class="card-head"><h3><i data-lucide="indian-rupee"></i> Credit Exposure by Aging Limit</h3></header>
+            <div class="chart-box"><canvas id="agingExposureChart"></canvas></div></article>
+        </div>
+        <article class="card glass"><header class="card-head"><h3><i data-lucide="list"></i> Aging Limit Summary</h3>
+          <button class="btn btn-ghost btn-sm" id="showMissingAging"><i data-lucide="filter"></i> View customers with blank Aging Limit</button></header>
+          <div class="table-wrap"><table class="data-table" id="agingTable"></table></div></article>
+      </section>
+
+      <!-- ---------- CUSTOMERS ---------- -->
+      <section class="view" id="view-customers" data-title="Customer Details">
+        <article class="card glass">
+          <div class="filters">
+            <label class="field field--search"><span>Search</span>
+              <div class="input-icon"><i data-lucide="search"></i><input id="fSearch" type="search" placeholder="Name, code, hub, salesman…"></div></label>
+            <label class="field"><span>Origin Hub</span><select id="fHub"><option value="">All hubs</option></select></label>
+            <label class="field"><span>Salesman</span><select id="fSalesman"><option value="">All salesmen</option></select></label>
+            <label class="field"><span>Aging Limit</span><select id="fAging"><option value="">All aging limits</option></select></label>
+            <label class="field"><span>Credit range</span><select id="fBucket"><option value="">Any amount</option></select></label>
+            <label class="field field--sm"><span>Min ₹</span><input id="fMin" type="number" min="0" step="1000" inputmode="numeric" placeholder="Min"></label>
+            <label class="field field--sm"><span>Max ₹</span><input id="fMax" type="number" min="0" step="1000" inputmode="numeric" placeholder="Max"></label>
+          </div>
+          <div class="toolbar">
+            <p class="muted" id="tableInfo">—</p>
+            <div class="toolbar-actions">
+              <button class="btn btn-ghost btn-sm" id="resetFilters"><i data-lucide="rotate-ccw"></i> Reset filters</button>
+              <button class="btn btn-ghost btn-sm" data-export="xlsx"><i data-lucide="file-spreadsheet"></i> Excel</button>
+              <button class="btn btn-ghost btn-sm" data-export="csv"><i data-lucide="file-text"></i> CSV</button>
+              <button class="btn btn-ghost btn-sm" data-export="print"><i data-lucide="printer"></i> Print</button>
+            </div>
+          </div>
+          <div class="table-wrap"><table class="data-table data-table--customers" id="customerTable"></table></div>
+          <div class="pager">
+            <label class="pager-size">Rows per page
+              <select id="pageSize"><option>25</option><option>50</option><option>100</option></select></label>
+            <div class="pager-nav" id="pager"></div>
+          </div>
+        </article>
+      </section>
+
+      <!-- ---------- UPLOAD ---------- -->
+      <section class="view" id="view-upload" data-title="Upload Data">
+        <div class="grid-2 grid-2--wide">
+          <article class="card glass">
+            <header class="card-head"><h3><i data-lucide="upload-cloud"></i> Upload Customer File</h3></header>
+            <div id="uploadGate" class="hidden banner banner--warn"></div>
+            <label class="dropzone" id="dropzone" tabindex="0">
+              <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" hidden>
+              <div class="dz-icon"><i data-lucide="file-up"></i></div>
+              <b>Drag &amp; drop the customer export here</b>
+              <span class="muted">or click to browse · .xlsx, .xls, .csv</span>
+              <span class="dz-file" id="dzFile"></span>
+            </label>
+            <div class="progress hidden" id="uploadProgress"><span></span></div>
+            <div id="uploadMsg" class="upload-msg" role="status" aria-live="polite"></div>
+            <div id="uploadPreview" class="hidden">
+              <div class="mini-grid mini-grid--3" id="previewStats"></div>
+              <div class="toolbar-actions">
+                <button class="btn btn-primary" id="confirmUpload"><i data-lucide="check-circle-2"></i> <span id="confirmLabel">Apply &amp; refresh dashboard</span></button>
+                <button class="btn btn-ghost" id="cancelUpload"><i data-lucide="x"></i> Cancel</button>
+              </div>
+            </div>
+          </article>
+          <article class="card glass">
+            <header class="card-head"><h3><i data-lucide="info"></i> Current Dataset</h3></header>
+            <dl class="meta-list" id="metaList"></dl>
+            <div class="rules">
+              <h4><i data-lucide="shield-check"></i> Filtering rules applied to every upload</h4>
+              <ol>
+                <li><b>Credit Limit</b> (column AG) must be a number <b>greater than 1</b>. Zero, 1, blank and invalid values are excluded.</li>
+                <li><b>Status</b> (column AJ) must be <b>ACTIVE</b>. INACTIVE and other statuses are excluded.</li>
+              </ol>
+              <p class="muted">Required columns: NAME (E), CODE (F), ORIGIN HUB (G), CREDIT LIMIT (AG), AGING LIMIT (AH), STATUS (AJ), SALESMAN (AW). Only these 7 columns are read; all other columns in the file are ignored and never stored.</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- ---------- EXPORT ---------- -->
+      <section class="view" id="view-export" data-title="Export Reports">
+        <div class="export-grid">
+          <button class="export-card glass tilt" data-export="xlsx"><i data-lucide="file-spreadsheet"></i><b>Customer list – Excel</b><span>Customers matching the current table filters (.xlsx)</span></button>
+          <button class="export-card glass tilt" data-export="csv"><i data-lucide="file-text"></i><b>Customer list – CSV</b><span>Customers matching the current table filters (.csv)</span></button>
+          <button class="export-card glass tilt" data-export="summary"><i data-lucide="book-open"></i><b>Full analytics workbook</b><span>KPIs, hubs, salesmen, credit ranges, aging and all eligible customers in one .xlsx</span></button>
+          <button class="export-card glass tilt" data-export="print"><i data-lucide="printer"></i><b>Print / Save as PDF</b><span>Printable report with KPIs and the filtered customer list</span></button>
+        </div>
+        <p class="muted center" id="exportInfo"></p>
+      </section>
+
+      <!-- ---------- THEMES ---------- -->
+      <section class="view" id="view-themes" data-title="Theme Settings">
+        <article class="card glass">
+          <header class="card-head"><h3><i data-lucide="palette"></i> Choose a theme</h3>
+            <div class="mode-switch" role="group" aria-label="Dark or light mode">
+              <button data-mode-set="dark"><i data-lucide="moon"></i> Dark</button>
+              <button data-mode-set="light"><i data-lucide="sun"></i> Light</button>
+            </div></header>
+          <div class="theme-grid" id="themeGrid"></div>
+          <p class="muted">Your choice is saved in this browser and applied instantly – no page refresh needed.</p>
+        </article>
+      </section>
+
+      <footer class="app-foot muted">SKYNET Worldwide Express · The Partnership that delivers · <span id="footVersion"></span></footer>
+    </main>
+  </div>
+
+  <!-- printable report (filled just before printing) -->
+  <div id="printArea" class="print-area" aria-hidden="true"></div>
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+
+  <!-- Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js" defer></script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js" defer></script>
+  <!-- SheetJS is loaded on demand (Excel upload/export) from config.cdn.xlsx -->
+
+  <!-- App -->
+  <script src="js/config.js" defer></script>
+  <script src="js/excel.js" defer></script>
+  <script src="js/filters.js" defer></script>
+  <script src="js/charts.js" defer></script>
+  <script src="js/dashboard.js" defer></script>
+  <script src="js/bg3d.js" defer></script>
+  <script src="js/app.js" defer></script>
+</body>
+</html>
