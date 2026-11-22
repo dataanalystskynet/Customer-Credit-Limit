@@ -89,12 +89,13 @@
   /* shared hover animation + click handling */
   function interaction(onPick) {
     return {
-      transitions: { active: { animation: { duration: 450, easing: 'easeOutBack' } } },
+      transitions: { active: { animation: { duration: 750, easing: 'easeOutBack' } } },
       onHover(evt, els) { if (evt.native && evt.native.target) evt.native.target.style.cursor = els.length && onPick ? 'pointer' : 'default'; },
       onClick(evt, els, chart) { if (onPick && els.length) onPick(chart.data.labels[els[0].index]); }
     };
   }
-  const grow = { delay: c => (c.type === 'data' && c.mode === 'default') ? c.dataIndex * 70 : 0, duration: 900, easing: 'easeOutQuart' };
+  /* slow, staggered grow: bars rise from the bottom (left→right for horizontal bars) */
+  const grow = { delay: c => (c.type === 'data' && c.mode === 'default') ? c.dataIndex * 140 : 0, duration: 1800, easing: 'easeOutCubic' };
 
   function gradient(ctx, area, c1, c2, horizontal) {
     if (!area) return c1;
@@ -131,10 +132,12 @@
     if (!canvas || !available()) return null;
     destroy(id);
     const chart = new Chart(canvas, config);
+    chart.$type = config.type;
     registry.set(id, chart);
     return chart;
   }
-  function destroy(id) { const c = registry.get(id); if (c) { c.destroy(); registry.delete(id); } }
+  function destroy(id) { stopSpinSafe(id); const c = registry.get(id); if (c) { c.destroy(); registry.delete(id); } }
+  function stopSpinSafe(id) { try { stopSpin(id); } catch (e) {} }
   function destroyAll() { registry.forEach(c => c.destroy()); registry.clear(); }
 
   const fmt = v => SKY.fmt.inr(v);
@@ -214,7 +217,7 @@
       options: Object.assign(interaction(onPick), {
         cutout: '62%',
         layout: { padding: { top: 16, bottom: 22, left: 16, right: 16 } },
-        animation: { animateRotate: true, animateScale: true, duration: 1100, easing: 'easeOutQuart' },
+        animation: { animateRotate: true, animateScale: true, duration: 2200, easing: 'easeOutCubic' },
         plugins: {
           depth3d: { depth: 14, colors },
           legend: { position: window.innerWidth < 640 ? 'bottom' : 'right', labels: { color: css('--text-2'), padding: 12 } },
@@ -232,8 +235,8 @@
       data: { labels, datasets: [{ data, backgroundColor: colors, borderColor: css('--surface-solid'), borderWidth: 2, hoverBorderWidth: 4, hoverBorderColor: 'rgba(255,255,255,.8)' }] },
       plugins: [depth3d],
       options: {
-        transitions: { active: { animation: { duration: 450, easing: 'easeOutBack' } } },
-        animation: { animateRotate: true, animateScale: true, duration: 1100 },
+        transitions: { active: { animation: { duration: 750, easing: 'easeOutBack' } } },
+        animation: { animateRotate: true, animateScale: true, duration: 2200, easing: 'easeOutCubic' },
         scales: { r: { grid: { color: gridColor() }, angleLines: { color: gridColor() }, ticks: { display: false } } },
         plugins: { depth3d: {}, legend: { position: window.innerWidth < 640 ? 'bottom' : 'right', labels: { color: css('--text-2') } },
           tooltip: { callbacks: { label: c => ` ${c.label}: ${c.raw} customers` } } }
@@ -246,6 +249,50 @@
   function markAllDirty(views) { views.forEach(v => dirty.add(v)); }
   function isDirty(view) { return dirty.has(view); }
   function clean(view) { dirty.delete(view); }
+
+  /* ---- Hover motion: when the mouse enters a chart card, replay the build-up
+     animation slowly (bars rise from the bottom); round charts keep turning
+     slowly while the mouse stays on the card. ---- */
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const spins = new Map();
+  function replay(id) {
+    const c = registry.get(id);
+    if (!c || reduceMotion) return;
+    const now = Date.now();
+    if (c.$lastReplay && now - c.$lastReplay < 2600) return;   // don't restart while still animating
+    c.$lastReplay = now;
+    c.reset(); c.update();
+  }
+  function startSpin(id) {
+    const c = registry.get(id);
+    if (!c || reduceMotion || !['doughnut', 'pie', 'polarArea'].includes(c.$type) || spins.has(id)) return;
+    let last = 0;
+    const step = t => {
+      if (!spins.has(id) || !registry.has(id)) return;
+      if (t - last > 33) {                       // ~30 fps, ~8° per second
+        last = t;
+        if (!c.$lastReplay || Date.now() - c.$lastReplay > 2300) {
+          c.options.startAngle = ((c.options.startAngle || 0) + .27) % 360;   // polar area
+          c.options.rotation = ((c.options.rotation || 0) + .27) % 360;       // doughnut / pie
+          c.update('none');
+        }
+      }
+      spins.set(id, requestAnimationFrame(step));
+    };
+    spins.set(id, requestAnimationFrame(step));
+  }
+  function stopSpin(id) { const r = spins.get(id); if (r) cancelAnimationFrame(r); spins.delete(id); }
+  const canvasesIn = card => [...card.querySelectorAll('canvas')].map(c => c.id).filter(id => registry.has(id));
+  document.addEventListener('mouseover', e => {
+    const card = e.target.closest && e.target.closest('.card');
+    if (!card || (e.relatedTarget && card.contains(e.relatedTarget))) return;
+    canvasesIn(card).forEach(id => { replay(id); startSpin(id); });
+  });
+  document.addEventListener('mouseout', e => {
+    const card = e.target.closest && e.target.closest('.card');
+    if (!card || (e.relatedTarget && card.contains(e.relatedTarget))) return;
+    canvasesIn(card).forEach(stopSpin);
+  });
 
   window.addEventListener('resize', debounce(() => registry.forEach(c => c.resize()), 200));
   function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }

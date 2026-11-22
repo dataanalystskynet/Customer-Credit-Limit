@@ -54,11 +54,11 @@
   }
 
   const CREDIT_BUCKETS = [
-    { label: '₹1 – ₹50,000',              min: 1,        max: 50000 },
-    { label: '₹50,001 – ₹1,00,000',       min: 50000,    max: 100000 },
-    { label: '₹1,00,001 – ₹5,00,000',     min: 100000,   max: 500000 },
-    { label: '₹5,00,001 – ₹10,00,000',    min: 500000,   max: 1000000 },
-    { label: 'Above ₹10,00,000',          min: 1000000,  max: Infinity }
+    { label: '₹ 1 – ₹ 50,000',              min: 1,        max: 50000 },
+    { label: '₹ 50,001 – ₹ 1,00,000',       min: 50000,    max: 100000 },
+    { label: '₹ 1,00,001 – ₹ 5,00,000',     min: 100000,   max: 500000 },
+    { label: '₹ 5,00,001 – ₹ 10,00,000',    min: 500000,   max: 1000000 },
+    { label: 'Above ₹ 10,00,000',          min: 1000000,  max: Infinity }
   ];
   // bucket i holds values in (min, max]; bucket 0 also catches anything >1
   function bucketIndex(v) {

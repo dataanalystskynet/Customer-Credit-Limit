@@ -169,13 +169,14 @@ Sessions last up to 6 hours. After 5 wrong passwords, that username is locked fo
 
 * **No login** – open the link and the dashboard loads.
 * **Auto-hide sidebar:** a slim icon rail that expands when the mouse moves over it (tap to open on touch screens).
-* **8 animated KPI cards:** eligible customers, total, average, highest and lowest credit limit, origin hubs, salesmen, and customers with a missing aging limit. Numbers count up; on hover the card tilts in 3D following the mouse, with a light glare and the content lifting forward.
-* **3D charts:** extruded bars, thick 3D doughnuts and soft shadows. Bars grow in one after another; on hover bars glow and doughnut slices pop out with a bounce.
+* **10 animated KPI cards:** eligible customers, total, average, highest and lowest credit limit, origin hubs, total credit of the two biggest hubs (Delhi and Mumbai; click for details), salesmen, and customers with a missing aging limit. The cards are solid 3D tiles that flip in, float gently, and on hover tilt with the mouse, thicken, show a moving light border, a shine sweep, a spinning 3D icon and layered depth.
+* **3D charts:** extruded bars, thick 3D doughnuts and soft shadows. Bars slowly rise from the bottom one after another. Moving the mouse onto a chart replays this slowly, and round charts keep turning slowly while the mouse stays there. Individual bars glow and doughnut slices pop out on hover.
 * **Salesman / Hub details:** click any salesman (bar, table row, or the name in Customer Details) or any hub to open a popup with their customers, totals, average, rank, hub/salesman breakdown, Excel/CSV export and a shortcut to the filtered customer table.
 * **Origin Hub analysis:** customers, total, average and highest per hub, plus the top hub. Includes a bar + line chart and a doughnut chart.
 * **Salesman analysis:** count, total and average per salesman. Shows the top 10, customer counts and a comparison of total vs average. Customers with no salesman appear as *Not Assigned*.
 * **Credit Limit analysis:** 5 ranges (₹1–₹50,000 … above ₹10,00,000) with customer count and exposure for each.
 * **Aging Limit analysis:** count and exposure for blank (*Not Available*), 7, 10, 15, 20, 25 and 30 days and any other values. One click lists the customers with a blank aging limit.
+* **Currency** is shown as `₹ 7,51,25,010` (Indian numbering, one space after ₹).
 * **Customer table:**
   * debounced global search, sorting on every column, pagination (25 / 50 / 100)
   * filters for hub, salesman, aging, credit range and min/max amount, plus **Reset all filters**

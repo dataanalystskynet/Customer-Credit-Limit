@@ -10,14 +10,14 @@
   const numFmt = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
   const TZ = () => SKY.config.timeZone || 'Asia/Kolkata';
   SKY.fmt = {
-    inr: v => inrFmt.format(Math.round(v || 0)),
+    inr: v => { const n = Math.round(v || 0); return (n < 0 ? '-' : '') + '₹ ' + numFmt.format(Math.abs(n)); },
     num: v => numFmt.format(v || 0),
     inrShort(v) {
       v = Number(v) || 0; const a = Math.abs(v);
-      if (a >= 1e7) return '₹' + (v / 1e7).toFixed(a >= 1e8 ? 1 : 2).replace(/\.0+$/, '') + ' Cr';
-      if (a >= 1e5) return '₹' + (v / 1e5).toFixed(2).replace(/\.?0+$/, '') + ' L';
-      if (a >= 1e3) return '₹' + (v / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
-      return '₹' + Math.round(v);
+      if (a >= 1e7) return '₹ ' + (v / 1e7).toFixed(a >= 1e8 ? 1 : 2).replace(/\.0+$/, '') + ' Cr';
+      if (a >= 1e5) return '₹ ' + (v / 1e5).toFixed(2).replace(/\.?0+$/, '') + ' L';
+      if (a >= 1e3) return '₹ ' + (v / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
+      return '₹ ' + Math.round(v);
     },
     pct: v => (v * 100).toFixed(1) + '%',
     dateTime(d) {
@@ -63,12 +63,14 @@
 
   /* ---------------- KPI cards ---------------- */
   const KPI_DEFS = [
-    { key: 'customers', label: 'Total Eligible Customers', icon: 'users', money: false, sub: k => `ACTIVE with credit limit > ₹1` },
+    { key: 'customers', label: 'Total Eligible Customers', icon: 'users', money: false, sub: k => `ACTIVE with credit limit > ₹ 1` },
     { key: 'totalCredit', label: 'Total Credit Limit', icon: 'wallet', money: true, sub: k => '≈ ' + SKY.fmt.inrShort(k.totalCredit) + ' total exposure' },
     { key: 'avgCredit', label: 'Average Credit Limit', icon: 'calculator', money: true, sub: () => 'Per eligible customer' },
     { key: 'maxCredit', label: 'Highest Credit Limit', icon: 'trending-up', money: true, sub: () => topName('max') },
     { key: 'minCredit', label: 'Lowest Credit Limit', icon: 'trending-down', money: true, sub: () => topName('min') },
     { key: 'hubs', label: 'Total Origin Hubs', icon: 'map-pin', money: false, sub: () => state.analytics.hubs.slice(0, 3).map(h => h.label).join(', ') },
+    { hub: 0, icon: 'building-2', money: true },
+    { hub: 1, icon: 'building', money: true },
     { key: 'salesmen', label: 'Total Salesmen', icon: 'briefcase', money: false, sub: k => k.unassigned ? `${k.unassigned} customers not assigned` : 'All customers assigned' },
     { key: 'missingAging', label: 'Missing Aging Limit', icon: 'alert-triangle', money: false, sub: k => k.customers ? `${SKY.fmt.pct(k.missingAging / k.customers)} of eligible customers` : '—' }
   ];
@@ -78,15 +80,29 @@
     const r = state.eligible.find(x => x.creditLimit === v);
     return r ? r.name : '—';
   }
+  /* Hub KPI cards (largest two hubs, e.g. Delhi & Mumbai) – resolved from live data */
+  function resolveKPI(d, k) {
+    if (d.hub == null) return { label: d.label, value: k[d.key], sub: d.sub(k), attrs: '' };
+    const h = state.analytics.hubs[d.hub];
+    if (!h) return { label: 'Hub ' + (d.hub + 1) + ' Credit', value: 0, sub: 'No data for this hub', attrs: '' };
+    return {
+      label: h.label + ' Hub Credit', value: h.total,
+      sub: `${SKY.fmt.num(h.count)} customers · ${SKY.fmt.pct(h.share)} share`,
+      attrs: ` data-type="hub" data-group="${esc(h.label)}" title="Click for ${esc(h.label)} hub details" role="button" tabindex="0"`
+    };
+  }
   function renderKPIs() {
     const k = state.analytics.kpi;
-    $('kpiGrid').innerHTML = KPI_DEFS.map((d, i) => `
-      <article class="kpi tilt" data-k="${i}" style="--i:${i}">
-        <div class="kpi-bg"><span class="kpi-glare"></span></div>
-        <div class="kpi-top"><span class="kpi-label">${d.label}</span><span class="kpi-icon"><i data-lucide="${d.icon}"></i></span></div>
-        <div class="kpi-value" data-count="${k[d.key]}" data-money="${d.money ? 1 : 0}">${d.money ? '₹0' : '0'}</div>
-        <div class="kpi-sub">${esc(d.sub(k))}</div>
-      </article>`).join('');
+    $('kpiGrid').innerHTML = KPI_DEFS.map((d, i) => {
+      const v = resolveKPI(d, k);
+      return `
+      <article class="kpi tilt" data-k="${i}" style="--i:${i}"${v.attrs}>
+        <div class="kpi-bg"><span class="kpi-shine"></span><span class="kpi-glare"></span></div>
+        <div class="kpi-top"><span class="kpi-label">${esc(v.label)}</span><span class="kpi-icon"><i data-lucide="${d.icon}"></i></span></div>
+        <div class="kpi-value" data-count="${v.value}" data-money="${d.money ? 1 : 0}">${d.money ? '₹ 0' : '0'}</div>
+        <div class="kpi-sub">${esc(v.sub)}</div>
+      </article>`;
+    }).join('');
     $('navCount').textContent = SKY.fmt.num(k.customers);
     SKY.icons();
     document.querySelectorAll('#kpiGrid .kpi-value').forEach(el => countUp(el, Number(el.dataset.count), el.dataset.money === '1'));
@@ -339,7 +355,7 @@
         const ci = keys.indexOf(mc); if (ci < 0) return;
         for (let r = 1; r <= rows.length; r++) {
           const cell = ws[XLSX.utils.encode_cell({ r, c: ci })];
-          if (cell && cell.t === 'n') cell.z = '"₹"#,##,##0';
+          if (cell && cell.t === 'n') cell.z = '"₹ "#,##,##0';
         }
       });
     }
@@ -384,7 +400,7 @@
       t.minCredit && `Min ${SKY.fmt.inr(t.minCredit)}`, t.maxCredit && `Max ${SKY.fmt.inr(t.maxCredit)}`].filter(Boolean).join(' · ') || 'None';
     $('printArea').innerHTML = `
       <div class="pr-head"><div><h1>Customer Credit Limit Report</h1><div>SKYNET WORLDWIDE EXPRESS · Printed ${SKY.fmt.dateTime(new Date())}</div>
-        <div>Source: ${esc(m.fileName || '—')} · Last upload: ${SKY.fmt.dateTime(m.uploadedAt)} · Rules: Status = ACTIVE and Credit Limit &gt; ₹1</div></div>
+        <div>Source: ${esc(m.fileName || '—')} · Last upload: ${SKY.fmt.dateTime(m.uploadedAt)} · Rules: Status = ACTIVE and Credit Limit &gt; ₹ 1</div></div>
         <img src="assets/skynet-logo.png" alt="SKYNET"></div>
       <div class="pr-kpis">
         <div><span>Eligible customers</span><b>${SKY.fmt.num(k.customers)}</b></div><div><span>Total credit limit</span><b>${SKY.fmt.inr(k.totalCredit)}</b></div>

@@ -6,7 +6,7 @@
   const C = SKY.config, D = SKY.Dashboard, X = SKY.Excel, F = SKY.Filters;
   const $ = id => document.getElementById(id);
   const esc = D.esc;
-  const VERSION = 'v1.1.0';
+  const VERSION = 'v1.2.0';
   const LS = {
     get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
     set(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } },
