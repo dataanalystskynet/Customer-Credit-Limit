@@ -1,10 +1,11 @@
 {
-  "fileName": "customers_22-Nov-2026-11-00-PM.csv",
-  "fileModified": null,
-  "uploadedAt": "2026-11-22T23:25:00+05:30",
-  "uploadedBy": "Initial release",
-  "totalRecords": 1971,
-  "eligible": 98,
-  "excluded": 1873,
-  "status": "Success"
+  "fileName": "customers_26-Nov-2026-12-11-PM.csv",
+  "fileModified": "2026-11-26T12:11:00+05:30",
+  "uploadedAt": "2026-11-26T12:13:44+05:30",
+  "uploadedBy": "dataanalystskynet",
+  "totalRecords": 2001,
+  "eligible": 99,
+  "excluded": 1902,
+  "status": "Success",
+  "autoUpdated": true
 }

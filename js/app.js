@@ -6,7 +6,7 @@
   const C = SKY.config, D = SKY.Dashboard, X = SKY.Excel, F = SKY.Filters;
   const $ = id => document.getElementById(id);
   const esc = D.esc;
-  const VERSION = 'v1.2.0';
+  const VERSION = 'v1.3.0';
   const LS = {
     get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
     set(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } },
@@ -192,6 +192,8 @@
 
   /* ---------------- data loading ---------------- */
   const LOCAL_KEY = 'sky.localDataset';
+  let publishedStamp = null;                       // last published meta.json seen
+  const stampOf = m => (m && m.uploadedAt ? m.uploadedAt + '|' + m.totalRecords + '|' + m.eligible : null);
   async function fetchText(url) {
     const res = await fetch(url + (url.includes('?') ? '&' : '?') + 'v=' + Date.now(), { cache: 'no-store' });
     if (!res.ok) throw new Error(`${url} → HTTP ${res.status}`);
@@ -222,6 +224,7 @@
     try {
       const [csv, meta] = await Promise.all([fetchText(C.dataUrl), fetchText(C.metaUrl).then(JSON.parse).catch(() => ({}))]);
       published = rowsFromCSV(csv); publishedMeta = Object.assign({}, meta, { source: 'Published dataset' });
+      publishedStamp = stampOf(meta);
     } catch (e) { console.warn('Published dataset not available:', e.message); }
     const local = readLocal();
     const localNewer = local && (!published || !publishedMeta.uploadedAt || new Date(local.meta.uploadedAt) > new Date(publishedMeta.uploadedAt));
@@ -283,7 +286,7 @@
     gate.classList.add('hidden'); $('uploadAuth').classList.add('hidden'); $('uploaderChip').classList.add('hidden');
     dz.classList.remove('disabled');
     if (!backendMode()) {
-      gate.innerHTML = '<i data-lucide="info"></i><span><b>Static mode:</b> uploads refresh the dashboard in <b>this browser only</b>. To share data with all users, configure the secure backend or publish <code>data/customers.csv</code> to GitHub (see README).</span>';
+      gate.innerHTML = '<i data-lucide="info"></i><span><b>Static mode:</b> uploads refresh the dashboard in <b>this browser only</b>. To update the dashboard for <b>everyone</b>, upload the Excel/CSV export to the GitHub repository (<b>Add file → Upload files</b>) – it updates automatically in about 2 minutes.</span>';
       gate.classList.remove('hidden');
     } else if (!s) {
       dz.classList.add('disabled');
@@ -416,12 +419,38 @@
     setTimeout(() => $('loader').classList.add('done'), 250);
   }
 
+  /* ---------------- auto-refresh (static mode) ----------------
+     When a new Excel is uploaded to GitHub, the "Auto-update dashboard data"
+     workflow rewrites data/meta.json. Every open dashboard checks that file
+     once a minute (and when the tab becomes visible) and reloads on change. */
+  const AUTO_REFRESH_MS = 60 * 1000;
+  let autoBusy = false;
+  async function checkForNewData() {
+    if (autoBusy || backendMode() || document.hidden) return;
+    autoBusy = true;
+    try {
+      const meta = JSON.parse(await fetchText(C.metaUrl));
+      const stamp = stampOf(meta);
+      if (stamp && stamp !== publishedStamp) {
+        await loadData(true);
+        SKY.toast(`New data loaded automatically – ${meta.fileName || 'customers.csv'} (${SKY.fmt.num(meta.eligible || D.state.eligible.length)} eligible).`, 'ok', 6000);
+      }
+    } catch (e) { console.warn('Auto-refresh check failed:', e.message); }
+    finally { autoBusy = false; }
+  }
+  function startAutoRefresh() {
+    if (backendMode()) return;
+    setInterval(checkForNewData, AUTO_REFRESH_MS);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForNewData(); });
+  }
+
   async function boot() {
     $('footVersion').textContent = VERSION;
     SKY.Charts.applyDefaults();
     bindThemes(); bindNav(); D.bindTable(); D.bindDetail(); bindTilt(); startClock();
     SKY.icons();
     await enterApp();   // no login – anyone with the link can view
+    startAutoRefresh();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();

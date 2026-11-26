@@ -29,7 +29,7 @@ The app reads only these 7 columns (matched by header name, with the usual Excel
 | AJ | STATUS | Status |
 | AW | SALESMAN | Salesman (blank = *Not Assigned*) |
 
-**Result for the bundled file (`customers_22-Nov-2026-11-00-PM.csv`):** 1,971 records → **98 eligible**, 1,873 excluded (63 not ACTIVE, 1,810 with Credit Limit ≤ 1). Total credit limit ₹7,51,25,010.
+**Result for the latest file (`customers_26-Nov-2026-12-11-PM.csv`):** 2,001 records → **99 eligible**, 1,902 excluded (63 not ACTIVE, 1,839 with Credit Limit ≤ 1 / blank). Total credit limit ₹7,58,55,010.
 
 ---
 
@@ -53,8 +53,9 @@ customer-credit-limit-report/
 │   ├── customers.csv           Published dataset (7 columns only)
 │   └── meta.json               File name, upload time, counts
 ├── backend/Code.gs             Secure backend (Google Apps Script)
+├── scripts/process_upload.py   Converts an uploaded Excel/CSV to data/customers.csv
 ├── scripts/validate_data.py    Dataset validator used by GitHub Actions
-├── .github/workflows/validate-data.yml
+├── .github/workflows/auto-update-data.yml   Auto-update on every Excel upload
 ├── .nojekyll
 └── README.md
 ```
@@ -89,7 +90,7 @@ There is **no login**: anyone who opens the link can view the dashboard.
    ```
 3. Open **Settings → Pages → Build and deployment → Source: Deploy from a branch → Branch: `main` / `(root)` → Save**.
 4. After 1–2 minutes the site is live at `https://<your-user>.github.io/customer-credit-limit-report/`.
-5. Open **Settings → Actions → General → Workflow permissions** and select **Read and write permissions**. The validation workflow needs this to update `meta.json`.
+5. Open **Settings → Actions → General → Workflow permissions** and select **Read and write permissions**. The auto-update workflow needs this to save the converted data.
 
 ---
 
@@ -155,13 +156,23 @@ Sessions last up to 6 hours. After 5 wrong passwords, that username is locked fo
 
 ---
 
-## 8. Updating data without a backend (Option B – GitHub upload)
+## 8. Updating data – just upload the Excel to GitHub (auto-update) ⭐
 
-1. Open the dashboard → **Upload Data** → drop the latest export (.xlsx/.xls/.csv).
-2. Check the counts (total / eligible / excluded) → **Apply & refresh dashboard**. This updates *your* browser straight away.
-3. Click **Download customers.csv for GitHub**. The downloaded file contains only the 7 columns.
-4. In GitHub open the `data` folder → **Add file → Upload files** → drop `customers.csv` → **Commit changes**.
-5. The **Validate customer dataset** action checks the file and updates `meta.json` with the commit time. If it fails, you get an email and the reason appears under the **Actions** tab. Pages republishes within about 1–2 minutes, and every user then sees the new data.
+1. Open the repository on GitHub → **Add file → Upload files**.
+2. Drop the latest customer export (**.xlsx / .xls / .csv**, the full export is fine) → **Commit changes**.
+3. The **Auto-update dashboard data** action (`.github/workflows/auto-update-data.yml`) starts automatically and:
+   * reads the file with `scripts/process_upload.py` (finds the header row and the 7 report columns by name),
+   * writes `data/customers.csv` with **only the 7 columns**,
+   * updates `data/meta.json` (file name, upload time, who uploaded, total / eligible / excluded),
+   * **deletes the raw upload** from the repository,
+   * republishes GitHub Pages.
+4. In about **1–2 minutes** every open dashboard reloads the new data by itself (it checks `meta.json` once a minute). No Refresh click is needed.
+
+If the file is wrong (missing columns, no ACTIVE customer with Credit Limit > 1) the action fails, the old data stays on the dashboard, and GitHub e-mails you. The reason appears under the **Actions** tab. You can re-run the conversion any time from **Actions → Auto-update dashboard data → Run workflow**.
+
+> ⚠️ **Privacy:** deleting the raw file removes it from the website, but it stays in the **git history** of a public repository. Best: make the repository **private** (GitHub Pages on a private repo needs a paid plan), or upload only the 7-column file from the dashboard's **Upload Data → Download customers.csv for GitHub** button.
+
+**One-time setting:** **Settings → Actions → General → Workflow permissions → Read and write permissions → Save**.
 
 ---
 
