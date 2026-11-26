@@ -1,0 +1,82 @@
+# Auto-update the dashboard whenever a customer export is uploaded.
+#
+# How to use: GitHub → this repository → Add file → Upload files →
+# drop the latest export (.xlsx / .xls / .csv) → Commit changes.
+# Within ~1-2 minutes this workflow converts it to data/customers.csv
+# (7 report columns only), updates data/meta.json, deletes the raw upload
+# and republishes GitHub Pages. Open dashboards refresh by themselves.
+name: Auto-update dashboard data
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**.xlsx'
+      - '**.xlsm'
+      - '**.xls'
+      - '**.csv'
+      - 'data/**'
+      - 'scripts/**'
+      - '.github/workflows/auto-update-data.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: auto-update-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 50
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Excel readers
+        run: pip install --quiet openpyxl==3.1.5 xlrd==2.0.1
+
+      - name: Convert uploaded file (7 columns only)
+        id: convert
+        run: python3 scripts/process_upload.py
+
+      - name: Validate dataset and sync meta.json
+        run: python3 scripts/validate_data.py --write-meta
+
+      - name: Commit updated data
+        id: commit
+        env:
+          SRC: ${{ steps.convert.outputs.file }}
+          ELIGIBLE: ${{ steps.convert.outputs.eligible }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add -A data/
+          git add -u .
+          if git diff --cached --quiet; then
+            echo "No data changes to commit."
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -n "$SRC" ]; then MSG="Auto-update dashboard from $SRC ($ELIGIBLE eligible)"; else MSG="Sync data/meta.json"; fi
+          git commit -m "$MSG"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && break
+            sleep 5
+          done
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Republish GitHub Pages
+        if: steps.commit.outputs.pushed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X POST "repos/${{ github.repository }}/pages/builds" || echo "Pages will rebuild on its own."
