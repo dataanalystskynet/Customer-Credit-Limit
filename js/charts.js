@@ -86,6 +86,28 @@
     }
   };
 
+  /* ---- value labels at the end of each bar, e.g. "68 (69%)" ---- */
+  const valueLabels = {
+    id: 'valueLabels',
+    afterDatasetsDraw(chart, args, opts) {
+      if (!opts || typeof opts.format !== 'function') return;
+      const ctx = chart.ctx, ds = chart.data.datasets[0], meta = chart.getDatasetMeta(0);
+      const total = ds.data.reduce((a, b) => a + (+b || 0), 0);
+      const horiz = chart.options.indexAxis === 'y';
+      ctx.save();
+      ctx.font = `700 12px ${css('--font') || 'Inter, sans-serif'}`;
+      ctx.fillStyle = css('--text');
+      meta.data.forEach((el, i) => {
+        const v = ds.data[i];
+        if (!v) return;
+        const txt = opts.format(v, total);
+        if (horiz) { ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(txt, el.x + 16, el.y); }
+        else { ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(txt, el.x, el.y - 12); }
+      });
+      ctx.restore();
+    }
+  };
+
   /* shared hover animation + click handling */
   function interaction(onPick) {
     return {
@@ -145,18 +167,21 @@
   const gridColor = () => css('--border');
 
   /* --- chart builders --- */
-  function bar(id, { labels, data, label, money, horizontal, colors, secondary, onPick }) {
+  function bar(id, { labels, data, label, money, horizontal, colors, secondary, onPick, valueLabels: vl }) {
     const a1 = css('--a1'), a2 = css('--a2');
+    const lineColor = css('--line-c') || '#38bdf8';
     const datasets = [{
-      label, data, borderRadius: 4, borderSkipped: false, maxBarThickness: 46,
+      label, data, order: 1, borderRadius: 4, borderSkipped: false, maxBarThickness: 46,
       borderWidth: 0, hoverBorderWidth: 3, hoverBorderColor: 'rgba(255,255,255,.85)',
       backgroundColor: colors || (c => gradient(c.chart.ctx, c.chart.chartArea, a1, a2, horizontal)),
       yAxisID: horizontal ? undefined : 'y', xAxisID: horizontal ? 'x' : undefined
     }];
     if (secondary) {
       datasets.push({
-        type: 'line', label: secondary.label, data: secondary.data, yAxisID: 'y2',
-        borderColor: css('--a3') || '#999', backgroundColor: css('--a3'), tension: .35, pointRadius: 4, pointHoverRadius: 6, borderWidth: 2.5
+        type: 'line', label: secondary.label, data: secondary.data, yAxisID: 'y2', order: 0,
+        borderColor: lineColor, backgroundColor: lineColor, borderWidth: 3, borderDash: [],
+        cubicInterpolationMode: 'monotone', tension: .3,
+        pointRadius: 5, pointHoverRadius: 8, pointBackgroundColor: lineColor, pointBorderColor: '#ffffff', pointBorderWidth: 2
       });
     }
     const valueAxis = {
@@ -167,18 +192,21 @@
       ticks: { autoSkip: false, maxRotation: 45, callback(v) { const l = this.getLabelForValue(v); return l.length > 18 ? l.slice(0, 17) + '…' : l; } } };
     const scales = horizontal ? { x: valueAxis, y: catAxis } : { x: catAxis, y: valueAxis };
     if (secondary) scales.y2 = { position: 'right', grid: { display: false }, border: { display: false }, beginAtZero: true,
-      ticks: { callback: v => secondary.money ? fmtShort(v) : (Number.isInteger(v) ? v : '') } };
+      ticks: { color: lineColor, font: { weight: '600' }, callback: v => secondary.money ? fmtShort(v) : (Number.isInteger(v) ? v : '') } };
     return make(id, {
       type: 'bar',
       data: { labels, datasets },
-      plugins: [depth3d],
+      plugins: vl ? [depth3d, valueLabels] : [depth3d],
       options: Object.assign(interaction(onPick), {
         indexAxis: horizontal ? 'y' : 'x',
         animation: grow,
-        layout: { padding: { top: 12, right: 14 } },
+        layout: { padding: { top: vl && !horizontal ? 28 : 12, right: vl && horizontal ? 86 : 14 } },
         plugins: {
-          depth3d: { depth: 9, top: shade(a2, .25), side: shade(a1, -.38) },
-          legend: { display: !!secondary },
+          depth3d: Array.isArray(colors)
+            ? { depth: 9, top: colors.map(c => shade(c, .25)), side: colors.map(c => shade(c, -.38)) }
+            : { depth: 9, top: shade(a2, .25), side: shade(a1, -.38) },
+          valueLabels: vl ? { format: vl } : false,
+          legend: { display: !!secondary, labels: { sort: (a, b) => a.datasetIndex - b.datasetIndex } },
           tooltip: { callbacks: { label: c => {
             const isSec = secondary && c.datasetIndex === 1;
             const m = isSec ? secondary.money : money;

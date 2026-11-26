@@ -6,7 +6,7 @@
   const C = SKY.config, D = SKY.Dashboard, X = SKY.Excel, F = SKY.Filters;
   const $ = id => document.getElementById(id);
   const esc = D.esc;
-  const VERSION = 'v1.3.0';
+  const VERSION = 'v1.4.0';
   const LS = {
     get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
     set(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } },
@@ -91,7 +91,20 @@
     // Touch screens (no hover): tap the rail to open it, tap a link to close it
     const sb = $('sidebar');
     sb.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse' && window.innerWidth > 960 && !sb.classList.contains('open')) { sb.classList.add('open'); if (!e.target.closest('.nav-link')) e.preventDefault(); } });
-    sb.addEventListener('click', e => { if (e.target.closest('.nav-link')) sb.classList.remove('open'); });
+    sb.addEventListener('click', e => {
+      const link = e.target.closest('.nav-link');
+      if (!link) return;
+      sb.classList.remove('open');
+      if (e.pointerType === 'mouse' || e.detail > 0) link.blur();   // mouse click: don't keep focus inside the menu
+    });
+    // Mouse: open while the pointer is over the menu, hide as soon as it leaves
+    sb.addEventListener('mouseleave', () => {
+      sb.classList.remove('open');
+      if (sb.contains(document.activeElement)) document.activeElement.blur();
+    });
+    // Keyboard (Tab) users: open while focus is inside the menu
+    sb.addEventListener('focusin', e => { try { if (e.target.matches(':focus-visible')) sb.classList.add('open'); } catch (_) {} });
+    sb.addEventListener('focusout', e => { if (!sb.contains(e.relatedTarget)) sb.classList.remove('open'); });
     document.addEventListener('pointerdown', e => { if (!e.target.closest('#sidebar')) sb.classList.remove('open'); });
     $('refreshBtn').addEventListener('click', async () => {
       const b = $('refreshBtn'); b.classList.add('spin');

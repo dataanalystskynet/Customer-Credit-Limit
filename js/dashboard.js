@@ -63,7 +63,7 @@
 
   /* ---------------- KPI cards ---------------- */
   const KPI_DEFS = [
-    { key: 'customers', label: 'Total Eligible Customers', icon: 'users', money: false, sub: k => `ACTIVE with credit limit > ₹ 1` },
+    { key: 'customers', label: 'Total Eligible Customers', icon: 'users', money: false, sub: () => '' },
     { key: 'totalCredit', label: 'Total Credit Limit', icon: 'wallet', money: true, sub: k => '≈ ' + SKY.fmt.inrShort(k.totalCredit) + ' total exposure' },
     { key: 'avgCredit', label: 'Average Credit Limit', icon: 'calculator', money: true, sub: () => 'Per eligible customer' },
     { key: 'maxCredit', label: 'Highest Credit Limit', icon: 'trending-up', money: true, sub: () => topName('max') },
@@ -149,8 +149,16 @@
       SKY.Charts.bar('ovBucketChart', { labels: a.buckets.map(b => b.label), data: a.buckets.map(b => b.count), label: 'Customers' });
       const top5 = a.salesmen.slice(0, 5);
       SKY.Charts.bar('ovSalesChart', { labels: top5.map(s => s.label), data: top5.map(s => s.total), label: 'Total credit limit', money: true, horizontal: true, onPick: l => showDetail('salesman', l) });
+      // Aging limit: simple horizontal bars – customers per aging slab, "Not Available" in red
       const ag = a.aging.filter(x => x.count);
-      SKY.Charts.polar('ovAgingChart', { labels: ag.map(x => x.label), data: ag.map(x => x.count) });
+      const agPal = ['#22c55e', '#3b82f6', '#a855f7', '#06b6d4', '#f59e0b', '#14b8a6', '#6366f1', '#84cc16', '#ec4899', '#0ea5e9'];
+      let pi = 0;
+      SKY.Charts.bar('ovAgingChart', {
+        labels: ag.map(x => x.label), data: ag.map(x => x.count), label: 'Customers', horizontal: true,
+        colors: ag.map(x => x.label === F.NOT_AVAILABLE ? '#ef4444' : agPal[pi++ % agPal.length]),
+        valueLabels: (v, t) => `${v} (${t ? Math.round(v / t * 100) : 0}%)`,
+        onPick: l => { setTableFilter({ aging: l }); location.hash = 'customers'; }
+      });
     },
     hubs() {
       const h = state.analytics.hubs;
@@ -270,7 +278,7 @@
     el.innerHTML = head + '<tbody>' + body + '</tbody>';
     const total = state.filtered.reduce((s, r) => s + r.creditLimit, 0);
     $('tableInfo').innerHTML = state.filtered.length
-      ? `Showing <b>${SKY.fmt.num(start + 1)}–${SKY.fmt.num(start + pageRows.length)}</b> of <b>${SKY.fmt.num(state.filtered.length)}</b> customers · Total credit <b>${SKY.fmt.inr(total)}</b>`
+      ? `Showing <b>${SKY.fmt.num(start + 1)}–${SKY.fmt.num(start + pageRows.length)}</b> of <b>${SKY.fmt.num(state.filtered.length)}</b> customers · Total credit <b class="total-amt">${SKY.fmt.inr(total)}</b>`
       : 'No matching customers';
     renderPager();
   }
